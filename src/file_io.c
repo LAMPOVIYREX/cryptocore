@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "../include/file_io.h"
+#include "file_io.h"
 
 unsigned char* read_file(const char* filename, size_t* file_size) {
     FILE* file = fopen(filename, "rb");
