@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 #include "crypto.h"
 #include "common.h"
 
@@ -33,6 +34,7 @@ unsigned char* aes_ecb_encrypt(const unsigned char* input, size_t input_len,
 unsigned char* aes_ecb_decrypt(const unsigned char* input, size_t input_len, 
                               const unsigned char* key, size_t* output_len) {
     if (input_len % AES_BLOCK_SIZE != 0) {
+        fprintf(stderr, "Error: Input length must be multiple of block size for ECB decryption\n");
         return NULL;
     }
     
@@ -44,6 +46,7 @@ unsigned char* aes_ecb_decrypt(const unsigned char* input, size_t input_len,
     }
     
     if (!pkcs7_unpad(&output, &input_len)) {
+        fprintf(stderr, "Error: PKCS#7 unpadding failed in ECB mode\n");
         free(output);
         return NULL;
     }

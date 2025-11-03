@@ -4,8 +4,8 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include "crypto.h"
-#include "types.h"
 #include "common.h"
+#include "types.h"
 
 // Utility functions
 int requires_padding(cipher_mode_t mode) {
@@ -14,10 +14,8 @@ int requires_padding(cipher_mode_t mode) {
 
 void generate_random_iv(unsigned char* iv, size_t len) {
     if (RAND_bytes(iv, len) != 1) {
-        // Fallback to less secure random if CSPRNG fails
-        for (size_t i = 0; i < len; i++) {
-            iv[i] = rand() % 256;
-        }
+        fprintf(stderr, "Error: Failed to generate cryptographically secure IV\n");
+        exit(1);
     }
 }
 
@@ -40,16 +38,19 @@ void pkcs7_pad(unsigned char** data, size_t* data_len) {
 
 int pkcs7_unpad(unsigned char** data, size_t* data_len) {
     if (*data_len == 0 || *data_len % AES_BLOCK_SIZE != 0) {
+        fprintf(stderr, "Error: Invalid data length for unpadding\n");
         return 0;
     }
     
     unsigned char padding_byte = (*data)[*data_len - 1];
     if (padding_byte == 0 || padding_byte > AES_BLOCK_SIZE) {
+        fprintf(stderr, "Error: Invalid padding byte\n");
         return 0;
     }
     
     for (size_t i = *data_len - padding_byte; i < *data_len; i++) {
         if ((*data)[i] != padding_byte) {
+            fprintf(stderr, "Error: Padding validation failed\n");
             return 0;
         }
     }
@@ -79,7 +80,6 @@ void aes_decrypt_block(const unsigned char* input, unsigned char* output, const 
     EVP_CIPHER_CTX_free(ctx);
 }
 
-// Остальной код modes.c остается без изменений (CBC, CFB, OFB, CTR реализации)
 // CBC Mode
 unsigned char* aes_cbc_encrypt(const unsigned char* input, size_t input_len,
                               const unsigned char* key, const unsigned char* iv,
@@ -121,6 +121,7 @@ unsigned char* aes_cbc_decrypt(const unsigned char* input, size_t input_len,
                               const unsigned char* key, const unsigned char* iv,
                               size_t* output_len) {
     if (input_len % AES_BLOCK_SIZE != 0) {
+        fprintf(stderr, "Error: Input length must be multiple of block size for CBC decryption\n");
         return NULL;
     }
     
@@ -153,31 +154,38 @@ unsigned char* aes_cbc_decrypt(const unsigned char* input, size_t input_len,
     return output;
 }
 
-// CFB Mode - Ultra simple manual implementation
+// CFB Mode - CFB-128 implementation (fixed)
 unsigned char* aes_cfb_encrypt(const unsigned char* input, size_t input_len,
                               const unsigned char* key, const unsigned char* iv,
                               size_t* output_len) {
     unsigned char* output = malloc(input_len);
     if (!output) return NULL;
     
-    unsigned char block[AES_BLOCK_SIZE];
+    unsigned char feedback[AES_BLOCK_SIZE];
     unsigned char encrypted_block[AES_BLOCK_SIZE];
     
-    // Initialize with IV
-    memcpy(block, iv, AES_BLOCK_SIZE);
+    // Initialize feedback register with IV
+    memcpy(feedback, iv, AES_BLOCK_SIZE);
     
-    for (size_t i = 0; i < input_len; i++) {
-        // Encrypt current block
-        aes_encrypt_block(block, encrypted_block, key);
+    for (size_t i = 0; i < input_len; i += AES_BLOCK_SIZE) {
+        // Encrypt the current feedback register
+        aes_encrypt_block(feedback, encrypted_block, key);
         
-        // XOR first byte with input
-        output[i] = input[i] ^ encrypted_block[0];
+        size_t block_size = (input_len - i < AES_BLOCK_SIZE) ? input_len - i : AES_BLOCK_SIZE;
         
-        // Shift block left and add new ciphertext byte to the end
-        for (int j = 0; j < AES_BLOCK_SIZE - 1; j++) {
-            block[j] = block[j + 1];
+        // XOR plaintext with encrypted block to get ciphertext
+        for (size_t j = 0; j < block_size; j++) {
+            output[i + j] = input[i + j] ^ encrypted_block[j];
         }
-        block[AES_BLOCK_SIZE - 1] = output[i];
+        
+        // Update feedback register with ciphertext (for CFB-128)
+        if (block_size == AES_BLOCK_SIZE) {
+            memcpy(feedback, output + i, AES_BLOCK_SIZE);
+        } else {
+            // For partial final block, shift and insert new ciphertext bytes
+            memmove(feedback, feedback + block_size, AES_BLOCK_SIZE - block_size);
+            memcpy(feedback + AES_BLOCK_SIZE - block_size, output + i, block_size);
+        }
     }
     
     *output_len = input_len;
@@ -187,15 +195,38 @@ unsigned char* aes_cfb_encrypt(const unsigned char* input, size_t input_len,
 unsigned char* aes_cfb_decrypt(const unsigned char* input, size_t input_len,
                               const unsigned char* key, const unsigned char* iv,
                               size_t* output_len) {
-    // CFB decryption uses the same algorithm as encryption
-    return aes_cfb_encrypt(input, input_len, key, iv, output_len);
-}
-
-unsigned char* aes_cfb_decrypt(const unsigned char* input, size_t input_len,
-                              const unsigned char* key, const unsigned char* iv,
-                              size_t* output_len) {
-    // CFB decryption is identical to encryption
-    return aes_cfb_encrypt(input, input_len, key, iv, output_len);
+    unsigned char* output = malloc(input_len);
+    if (!output) return NULL;
+    
+    unsigned char feedback[AES_BLOCK_SIZE];
+    unsigned char encrypted_block[AES_BLOCK_SIZE];
+    
+    // Initialize feedback register with IV
+    memcpy(feedback, iv, AES_BLOCK_SIZE);
+    
+    for (size_t i = 0; i < input_len; i += AES_BLOCK_SIZE) {
+        // Encrypt the current feedback register
+        aes_encrypt_block(feedback, encrypted_block, key);
+        
+        size_t block_size = (input_len - i < AES_BLOCK_SIZE) ? input_len - i : AES_BLOCK_SIZE;
+        
+        // XOR ciphertext with encrypted block to get plaintext
+        for (size_t j = 0; j < block_size; j++) {
+            output[i + j] = input[i + j] ^ encrypted_block[j];
+        }
+        
+        // Update feedback register with ciphertext (not plaintext)
+        if (block_size == AES_BLOCK_SIZE) {
+            memcpy(feedback, input + i, AES_BLOCK_SIZE);
+        } else {
+            // For partial final block, shift and insert new ciphertext bytes
+            memmove(feedback, feedback + block_size, AES_BLOCK_SIZE - block_size);
+            memcpy(feedback + AES_BLOCK_SIZE - block_size, input + i, block_size);
+        }
+    }
+    
+    *output_len = input_len;
+    return output;
 }
 
 // OFB Mode
