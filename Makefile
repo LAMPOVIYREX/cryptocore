@@ -14,7 +14,11 @@ TEST_SRC = tests/test_roundtrip.c
 TEST_OBJ = $(OBJ_DIR)/test_roundtrip.o
 TEST_TARGET = $(BIN_DIR)/test_roundtrip
 
-.PHONY: all clean test
+CSRPNG_TEST_SRC = tests/test_csprng.c
+CSRPNG_TEST_OBJ = $(OBJ_DIR)/test_csprng.o
+CSRPNG_TEST_TARGET = $(BIN_DIR)/test_csprng
+
+.PHONY: all clean test csprng_test
 
 all: $(TARGET)
 
@@ -24,20 +28,34 @@ $(TARGET): $(OBJECTS) | $(BIN_DIR)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Правило для компиляции тестовых файлов
+$(OBJ_DIR)/%.o: tests/%.c | $(OBJ_DIR)
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -c $< -o $@
+
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-test: $(TEST_TARGET)
+test: $(TEST_TARGET) $(CSRPNG_TEST_TARGET)
+	@echo "=== Running Round-trip Tests ==="
 	./$(TEST_TARGET)
+	@echo ""
+	@echo "=== Running CSPRNG Tests ==="
+	./$(CSRPNG_TEST_TARGET)
 
 $(TEST_TARGET): $(TEST_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJECTS)) | $(BIN_DIR)
 	$(CC) $(TEST_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJECTS)) -o $@ $(LDFLAGS)
 
+csprng_test: $(CSRPNG_TEST_TARGET)
+	./$(CSRPNG_TEST_TARGET)
+
+$(CSRPNG_TEST_TARGET): $(CSRPNG_TEST_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJECTS)) | $(BIN_DIR)
+	$(CC) $(CSRPNG_TEST_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJECTS)) -o $@ $(LDFLAGS)
+
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -rf $(OBJ_DIR) $(BIN_DIR) nist_test_data.bin
 
 install-dependencies:
 	sudo apt-get update

@@ -3,13 +3,16 @@
 #include <string.h>
 #include "types.h"
 #include "cli_parser.h"
+#include "csprng.h"
 
 void print_usage(const char* program_name) {
-    fprintf(stderr, "Usage: %s -algorithm aes -mode [ecb|cbc|cfb|ofb|ctr] (-encrypt | -decrypt) -key @HEX_KEY -input INPUT_FILE [-output OUTPUT_FILE] [-iv @HEX_IV]\n", program_name);
+    fprintf(stderr, "Usage: %s -algorithm aes -mode [ecb|cbc|cfb|ofb|ctr] (-encrypt | -decrypt) [-key @HEX_KEY] -input INPUT_FILE [-output OUTPUT_FILE] [-iv @HEX_IV]\n", program_name);
     fprintf(stderr, "Examples:\n");
-    fprintf(stderr, "  Encryption: %s -algorithm aes -mode cbc -encrypt -key @00112233445566778899aabbccddeeff -input plain.txt -output cipher.bin\n", program_name);
+    fprintf(stderr, "  Encryption with generated key: %s -algorithm aes -mode cbc -encrypt -input plain.txt -output cipher.bin\n", program_name);
+    fprintf(stderr, "  Encryption with specific key: %s -algorithm aes -mode cbc -encrypt -key @00112233445566778899aabbccddeeff -input plain.txt -output cipher.bin\n", program_name);
     fprintf(stderr, "  Decryption: %s -algorithm aes -mode cbc -decrypt -key @00112233445566778899aabbccddeeff -iv @aabbccddeeff00112233445566778899 -input cipher.bin -output decrypted.txt\n", program_name);
     fprintf(stderr, "Supported modes: ecb, cbc, cfb, ofb, ctr\n");
+    fprintf(stderr, "Note: For encryption, -key is optional. If omitted, a secure random key will be generated and displayed.\n");
 }
 
 cipher_mode_t parse_cipher_mode(const char* mode_str) {
@@ -81,6 +84,13 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
             decrypt_flag = 1;
         }
         else if (strcmp(argv[i], "-key") == 0 && i + 1 < argc) {
+            // Проверяем, не пытается ли пользователь сгенерировать ключ сам через @
+            if (strcmp(argv[i+1], "@generate") == 0) {
+                fprintf(stderr, "Error: Omit --key argument to generate random key, don't use @generate\n");
+                if (mode_str) free(mode_str);
+                return 0;
+            }
+            
             if (!hex_to_bytes(argv[i+1], &args->key, &args->key_len)) {
                 if (mode_str) free(mode_str);
                 return 0;
@@ -147,14 +157,59 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
         return 0;
     }
     
-    if (args->key == NULL) {
-        fprintf(stderr, "Error: Key is required\n");
+    // KEY VALIDATION - UPDATED FOR MILESTONE 3
+    if (args->operation == MODE_ENCRYPT && args->key == NULL) {
+        // Генерируем случайный ключ
+        char* generated_key_hex = generate_random_key_hex(16);
+        if (generated_key_hex == NULL) {
+            fprintf(stderr, "Error: Failed to generate random key\n");
+            return 0;
+        }
+        
+        // Парсим сгенерированный ключ как обычный hex
+        if (!hex_to_bytes(generated_key_hex, &args->key, &args->key_len)) {
+            free(generated_key_hex);
+            return 0;
+        }
+        
+        // Сохраняем hex представление для вывода пользователю
+        args->generated_key_hex = generated_key_hex;
+    } else if (args->key == NULL) {
+        // Для дешифрования ключ обязателен
+        fprintf(stderr, "Error: Key is required for decryption\n");
+        return 0;
+    } else if (args->key_len != 16) {
+        fprintf(stderr, "Error: Key must be 16 bytes for AES-128\n");
         return 0;
     }
     
-    if (args->key_len != 16) {
-        fprintf(stderr, "Error: Key must be 16 bytes for AES-128\n");
-        return 0;
+    // Проверка на слабые ключи (дополнительное требование)
+    if (args->key != NULL && args->operation == MODE_ENCRYPT && args->generated_key_hex == NULL) {
+        int is_weak = 1;
+        // Проверяем, не все ли байты одинаковые
+        for (size_t i = 1; i < args->key_len; i++) {
+            if (args->key[i] != args->key[0]) {
+                is_weak = 0;
+                break;
+            }
+        }
+        
+        if (is_weak) {
+            fprintf(stderr, "Warning: The provided key may be weak (all bytes identical)\n");
+        }
+        
+        // Проверяем последовательные байты
+        is_weak = 1;
+        for (size_t i = 1; i < args->key_len; i++) {
+            if (args->key[i] != args->key[i-1] + 1) {
+                is_weak = 0;
+                break;
+            }
+        }
+        
+        if (is_weak) {
+            fprintf(stderr, "Warning: The provided key may be weak (sequential bytes)\n");
+        }
     }
     
     if (args->input_file == NULL) {
@@ -198,4 +253,5 @@ void free_cli_args(cli_args_t* args) {
     if (args->input_file) free(args->input_file);
     if (args->output_file) free(args->output_file);
     if (args->iv) free(args->iv);
+    if (args->generated_key_hex) free(args->generated_key_hex); // NEW
 }

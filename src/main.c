@@ -16,6 +16,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
+    // Выводим сгенерированный ключ если он был создан
+    if (args.operation == MODE_ENCRYPT && args.generated_key_hex != NULL) {
+        printf("Generated random key: %s\n", args.generated_key_hex);
+    }
+    
     // Read input file
     size_t input_size;
     unsigned char* input_data = read_file(args.input_file, &input_size);

@@ -6,6 +6,7 @@
 #include "crypto.h"
 #include "common.h"
 #include "types.h"
+#include "csprng.h"
 
 // Utility functions
 int requires_padding(cipher_mode_t mode) {
@@ -13,7 +14,7 @@ int requires_padding(cipher_mode_t mode) {
 }
 
 void generate_random_iv(unsigned char* iv, size_t len) {
-    if (RAND_bytes(iv, len) != 1) {
+    if (generate_random_bytes(iv, len) != 0) {
         fprintf(stderr, "Error: Failed to generate cryptographically secure IV\n");
         exit(1);
     }

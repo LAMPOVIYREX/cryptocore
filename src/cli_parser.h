@@ -15,6 +15,7 @@ typedef struct {
     unsigned char* iv;
     size_t iv_len;
     int iv_provided;
+    char* generated_key_hex; // NEW: для хранения сгенерированного ключа в hex
 } cli_args_t;
 
 int parse_arguments(int argc, char* argv[], cli_args_t* args);
