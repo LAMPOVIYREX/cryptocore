@@ -6,13 +6,14 @@
 #include "csprng.h"
 
 void print_usage(const char* program_name) {
-    fprintf(stderr, "Usage: %s -algorithm aes -mode [ecb|cbc|cfb|ofb|ctr] (-encrypt | -decrypt) [-key @HEX_KEY] -input INPUT_FILE [-output OUTPUT_FILE] [-iv @HEX_IV]\n", program_name);
+    fprintf(stderr, "Usage: %s -algorithm aes -mode [ecb|cbc|cfb|ofb|ctr] (-encrypt | -decrypt) [-key HEX_KEY] -input INPUT_FILE [-output OUTPUT_FILE] [-iv HEX_IV]\n", program_name);
     fprintf(stderr, "Examples:\n");
     fprintf(stderr, "  Encryption with generated key: %s -algorithm aes -mode cbc -encrypt -input plain.txt -output cipher.bin\n", program_name);
-    fprintf(stderr, "  Encryption with specific key: %s -algorithm aes -mode cbc -encrypt -key @00112233445566778899aabbccddeeff -input plain.txt -output cipher.bin\n", program_name);
-    fprintf(stderr, "  Decryption: %s -algorithm aes -mode cbc -decrypt -key @00112233445566778899aabbccddeeff -iv @aabbccddeeff00112233445566778899 -input cipher.bin -output decrypted.txt\n", program_name);
+    fprintf(stderr, "  Encryption with specific key: %s -algorithm aes -mode cbc -encrypt -key 00112233445566778899aabbccddeeff -input plain.txt -output cipher.bin\n", program_name);
+    fprintf(stderr, "  Decryption: %s -algorithm aes -mode cbc -decrypt -key 00112233445566778899aabbccddeeff -iv aabbccddeeff00112233445566778899 -input cipher.bin -output decrypted.txt\n", program_name);
     fprintf(stderr, "Supported modes: ecb, cbc, cfb, ofb, ctr\n");
     fprintf(stderr, "Note: For encryption, -key is optional. If omitted, a secure random key will be generated and displayed.\n");
+    fprintf(stderr, "Key and IV should be provided as hexadecimal strings WITHOUT @ prefix.\n");
 }
 
 cipher_mode_t parse_cipher_mode(const char* mode_str) {
@@ -25,13 +26,8 @@ cipher_mode_t parse_cipher_mode(const char* mode_str) {
 }
 
 int hex_to_bytes(const char* hex_str, unsigned char** bytes, size_t* len) {
-    if (hex_str[0] != '@') {
-        fprintf(stderr, "Error: Hexadecimal value must start with '@' followed by hexadecimal characters\n");
-        return 0;
-    }
-    
-    const char* hex_data = hex_str + 1;
-    size_t hex_len = strlen(hex_data);
+    // Убрана проверка на @ - теперь ключи и IV принимаются без префикса
+    size_t hex_len = strlen(hex_str);
     
     if (hex_len == 0 || hex_len % 2 != 0) {
         fprintf(stderr, "Error: Hexadecimal value must have even number of digits\n");
@@ -46,8 +42,8 @@ int hex_to_bytes(const char* hex_str, unsigned char** bytes, size_t* len) {
     }
     
     for (size_t i = 0; i < *len; i++) {
-        if (sscanf(hex_data + 2*i, "%2hhx", &(*bytes)[i]) != 1) {
-            fprintf(stderr, "Error: Invalid hexadecimal character\n");
+        if (sscanf(hex_str + 2*i, "%2hhx", &(*bytes)[i]) != 1) {
+            fprintf(stderr, "Error: Invalid hexadecimal character at position %zu\n", 2*i);
             free(*bytes);
             *bytes = NULL;
             return 0;
@@ -84,13 +80,6 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
             decrypt_flag = 1;
         }
         else if (strcmp(argv[i], "-key") == 0 && i + 1 < argc) {
-            // Проверяем, не пытается ли пользователь сгенерировать ключ сам через @
-            if (strcmp(argv[i+1], "@generate") == 0) {
-                fprintf(stderr, "Error: Omit --key argument to generate random key, don't use @generate\n");
-                if (mode_str) free(mode_str);
-                return 0;
-            }
-            
             if (!hex_to_bytes(argv[i+1], &args->key, &args->key_len)) {
                 if (mode_str) free(mode_str);
                 return 0;
@@ -253,5 +242,5 @@ void free_cli_args(cli_args_t* args) {
     if (args->input_file) free(args->input_file);
     if (args->output_file) free(args->output_file);
     if (args->iv) free(args->iv);
-    if (args->generated_key_hex) free(args->generated_key_hex); // NEW
+    if (args->generated_key_hex) free(args->generated_key_hex);
 }

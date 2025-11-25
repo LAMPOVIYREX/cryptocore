@@ -30,16 +30,15 @@ char* generate_random_key_hex(size_t key_len) {
         return NULL;
     }
     
-    // Convert to hexadecimal string
-    char* hex_string = malloc(key_len * 2 + 2); // +1 for '@', +1 for null terminator
+    // Convert to hexadecimal string (БЕЗ @ в начале!)
+    char* hex_string = malloc(key_len * 2 + 1); // +1 for null terminator
     if (hex_string == NULL) {
         free(key_bytes);
         return NULL;
     }
     
-    hex_string[0] = '@';
     for (size_t i = 0; i < key_len; i++) {
-        sprintf(hex_string + 1 + i * 2, "%02x", key_bytes[i]);
+        sprintf(hex_string + i * 2, "%02x", key_bytes[i]);
     }
     
     free(key_bytes);

@@ -18,7 +18,9 @@ CSRPNG_TEST_SRC = tests/test_csprng.c
 CSRPNG_TEST_OBJ = $(OBJ_DIR)/test_csprng.o
 CSRPNG_TEST_TARGET = $(BIN_DIR)/test_csprng
 
-.PHONY: all clean test csprng_test
+NIST_TEST_SCRIPT = tests/run_nist_tests.sh
+
+.PHONY: all clean test csprng_test nist_test
 
 all: $(TARGET)
 
@@ -53,6 +55,16 @@ csprng_test: $(CSRPNG_TEST_TARGET)
 
 $(CSRPNG_TEST_TARGET): $(CSRPNG_TEST_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJECTS)) | $(BIN_DIR)
 	$(CC) $(CSRPNG_TEST_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJECTS)) -o $@ $(LDFLAGS)
+
+nist_test: $(CSRPNG_TEST_TARGET)
+	@echo "=== Running NIST Statistical Tests ==="
+	@if [ -f "$(NIST_TEST_SCRIPT)" ]; then \
+		chmod +x $(NIST_TEST_SCRIPT) && ./$(NIST_TEST_SCRIPT); \
+	else \
+		echo "Error: NIST test script not found"; \
+		echo "Please generate test data manually: ./bin/test_csprng"; \
+		echo "Then run NIST STS on nist_test_data.bin"; \
+	fi
 
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR) nist_test_data.bin

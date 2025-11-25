@@ -18,16 +18,14 @@ void test_roundtrip_mode(const char* mode_name, cipher_mode_t mode, int requires
         assert(generate_random_bytes(iv, 16) == 0);
     }
     
-    // Create test data of different sizes
+    // Create test data
     unsigned char test_data_15[] = "15 bytes test!!";
-    unsigned char test_data_16[] = "16 bytes test!!!";
-    unsigned char test_data_17[] = "17 bytes test!!!!";
     
     size_t encrypted_len, decrypted_len;
     unsigned char* encrypted;
     unsigned char* decrypted;
     
-    // Test with 15 bytes (requires padding for some modes)
+    // Test with 15 bytes
     if (requires_iv) {
         encrypted = NULL;
         if (mode == CIPHER_MODE_CBC) {
