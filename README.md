@@ -1,15 +1,22 @@
 # CryptoCore
 
-A command-line tool for AES encryption and decryption supporting multiple modes of operation (ECB, CBC, CFB, OFB, CTR).
+A command-line tool for AES encryption and decryption supporting multiple modes of operation (ECB, CBC, CFB, OFB, CTR) and cryptographic hash functions (SHA-256, SHA3-256).
 
 ## Features
 
-- **Algorithms**: AES-128
-- **Modes**: ECB, CBC, CFB, OFB, CTR  
-- **Padding**: PKCS#7 (for ECB and CBC modes)
-- **Key Management**: Automatic secure key generation or hexadecimal input
-- **IV Handling**: Automatic generation for encryption, file-based or argument for decryption
-- **Security**: Cryptographically secure random number generation using OpenSSL RAND_bytes
+- **Encryption/Decryption**:
+  - **Algorithms**: AES-128
+  - **Modes**: ECB, CBC, CFB, OFB, CTR  
+  - **Padding**: PKCS#7 (for ECB and CBC modes)
+  - **Key Management**: Automatic secure key generation or hexadecimal input
+  - **IV Handling**: Automatic generation for encryption, file-based or argument for decryption
+  - **Security**: Cryptographically secure random number generation using OpenSSL RAND_bytes
+
+- **Hashing (Sprint 4)**:
+  - **SHA-256**: Implemented from scratch following NIST FIPS 180-4
+  - **SHA3-256**: Using OpenSSL's implementation
+  - **File Support**: Handles files of any size with streaming processing
+  - **Output Format**: Standard hash format compatible with system tools
 
 ## Build Instructions
 
@@ -21,12 +28,13 @@ A command-line tool for AES encryption and decryption supporting multiple modes 
 ### On Ubuntu/Debian:
 ```bash
 sudo apt-get update
-sudo apt-get install build-essential libssl-dev
+sudo apt-get install build-essential libssl-dev openssl xxd
 
 Build:
 bash
 make
 Usage
+Encryption/Decryption
 Encryption with auto-generated key:
 bash
 ./bin/cryptocore -algorithm aes -mode cbc -encrypt -input plain.txt -output cipher.bin
@@ -42,7 +50,20 @@ bash
 Decryption:
 bash
 ./bin/cryptocore -algorithm aes -mode cbc -decrypt -key 00112233445566778899aabbccddeeff -input cipher.bin -output decrypted.txt
-Supported Modes:
+Hashing (Sprint 4)
+Basic hash computation:
+bash
+./bin/cryptocore dgst --algorithm sha256 --input document.pdf
+Hash with output to file:
+bash
+./bin/cryptocore dgst --algorithm sha3-256 --input backup.tar --output backup.sha3
+Verify against system tools:
+bash
+./bin/cryptocore dgst --algorithm sha256 --input test.txt > my_hash.txt
+sha256sum test.txt > system_hash.txt
+diff my_hash.txt system_hash.txt
+Supported Modes
+Encryption Modes:
 ecb - Electronic Codebook (no IV)
 
 cbc - Cipher Block Chaining
@@ -52,6 +73,11 @@ cfb - Cipher Feedback
 ofb - Output Feedback
 
 ctr - Counter
+
+Hash Algorithms:
+sha256 - SHA-256 (implemented from scratch)
+
+sha3-256 - SHA3-256 (using OpenSSL)
 
 Key and IV Format
 Keys: 16-byte hexadecimal strings (32 hex characters)
@@ -69,62 +95,22 @@ Provides cryptographically strong randomness
 
 Is suitable for cryptographic key generation
 
-NIST Statistical Test Suite
-Installing NIST STS
-Download from NIST website
+Hashing Implementation
+SHA-256:
+Implemented from scratch following NIST FIPS 180-4
 
-Extract and compile:
+Uses Merkle-Damgård construction with 512-bit blocks
 
-bash
-tar -xzf sts-2.1.2.tar.gz
-cd sts-2.1.2
-make
-Running NIST Tests
-Generate test data using CryptoCore's CSPRNG:
+Processes files in chunks for memory efficiency
 
-bash
-make csprng_test
-./bin/test_csprng
-Run NIST STS on generated data:
+Passes NIST test vectors
 
-bash
-cd sts-2.1.2
-./assess 1000000
-# Follow prompts to specify the test file: ../nist_test_data.bin
-View results in ./experiments/AlgorithmTesting/finalAnalysisReport.txt
+SHA3-256:
+Uses OpenSSL's EVP interface
 
-Expected Results
-A properly functioning CSPRNG should pass the majority of NIST tests. Typical results:
+Based on Keccak sponge construction
 
-Frequency Test: PASS
-
-Block Frequency Test: PASS
-
-Runs Test: PASS
-
-Longest Runs Test: PASS
-
-DFT Test: PASS
-
-Non-overlapping Templates: PASS (most templates)
-
-Overlapping Templates: PASS
-
-Universal Statistical Test: PASS
-
-Linear Complexity Test: PASS
-
-Serial Test: PASS
-
-Approximate Entropy Test: PASS
-
-Cumulative Sums Test: PASS
-
-Random Excursions Test: PASS (most states)
-
-Random Excursions Variant Test: PASS (most states)
-
-A small number of failures is statistically expected, but widespread failures indicate RNG flaws.
+Interoperable with system sha3sum tool
 
 Testing
 Run all tests:
@@ -132,17 +118,64 @@ bash
 make test
 Run specific test suites:
 bash
-# Round-trip tests
-./tests/test_roundtrip.sh
+# Unit tests
+make csprng_test
+make roundtrip_test
+make hash_test
 
-# OpenSSL interoperability
-./tests/test_interoperability.sh
+# Integration tests
+./tests/scripts/test_roundtrip.sh
+./tests/scripts/test_interoperability.sh
+./tests/scripts/test_key_generation.sh
+Hash function tests:
+bash
+make hash_test
+./tests/bin/test_hash
+NIST Statistical Test Suite:
+bash
+make nist_test
+# Follow instructions to run NIST STS
+Examples
+File Encryption and Decryption:
+bash
+# Encrypt with random key
+./bin/cryptocore -algorithm aes -mode ctr -encrypt -input secret.txt -output secret.enc
 
-# Key generation tests
-./tests/test_key_generation.sh
+# Decrypt with the generated key
+./bin/cryptocore -algorithm aes -mode ctr -decrypt -key <generated_key> -input secret.enc -output secret_decrypted.txt
+File Integrity Verification:
+bash
+# Compute hash
+./bin/cryptocore dgst --algorithm sha256 --input important_document.pdf > document.sha256
 
-# CSPRNG statistical tests
-./bin/test_csprng
+# Later verify
+./bin/cryptocore dgst --algorithm sha256 --input important_document.pdf > check.sha256
+diff document.sha256 check.sha256
+Interoperability with OpenSSL:
+bash
+# Encrypt with CryptoCore, decrypt with OpenSSL
+./bin/cryptocore -algorithm aes -mode cbc -encrypt -key 00112233445566778899aabbccddeeff -input plain.txt -output cc_cipher.bin
+openssl enc -aes-128-cbc -d -K 00112233445566778899aabbccddeeff -in cc_cipher.bin -out openssl_decrypted.txt
+Project Structure
+text
+cryptocore/
+├── bin/                    # Compiled binaries
+├── include/               # Header files
+│   ├── hash/             # Hash function headers
+│   ├── modes/            # Encryption mode headers
+│   └── *.h               # Other headers
+├── src/                  # Source code
+│   ├── hash/             # Hash implementations
+│   ├── modes/            # Encryption mode implementations
+│   └── *.c               # Other source files
+├── tests/                # Test files
+│   ├── bin/              # Test binaries
+│   ├── data/             # Test data
+│   ├── results/          # Test results
+│   ├── scripts/          # Test scripts
+│   └── src/              # Test source code
+├── Makefile              # Build system
+└── README.md             # This file
 Security Notes
 Generated keys are displayed only once - save them securely
 
@@ -152,64 +185,52 @@ IVs are automatically generated using CSPRNG for encryption
 
 For decryption, IVs can be read from file or provided via command line
 
+Hash functions process files in chunks to handle large files efficiently
+
+Hashing Support (Sprint 4)
+CryptoCore now supports cryptographic hash functions for data integrity verification.
+
+Available Hash Algorithms
+SHA-256 - Implemented from scratch following NIST FIPS 180-4
+
+SHA3-256 - Using OpenSSL's implementation
+
+Output Format
+The tool outputs hashes in the standard format:
+
 text
+HASH_VALUE  INPUT_FILE_PATH
+Examples
+bash
+# Verify against system tools
+./bin/cryptocore dgst --algorithm sha256 --input test.txt > my_hash.txt
+sha256sum test.txt > system_hash.txt
+diff my_hash.txt system_hash.txt
 
-## 4. Создаем скрипт для автоматического NIST тестирования `tests/run_nist_tests.sh`
+# Empty file test (SHA-256 of empty string):
+echo -n "" | ./bin/cryptocore dgst --algorithm sha256 --input -
+# Output: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  -
+Testing Hash Functions
+Run the hash function tests:
 
-```bash
-#!/bin/bash
+bash
+make test_hash_build
+./tests/bin/test_hash
+Implementation Notes
+SHA-256 is implemented from scratch (no external dependencies)
 
-echo "=== NIST Statistical Test Suite Runner ==="
+SHA3-256 uses OpenSSL's EVP interface
 
-# Check if NIST STS is available
-NIST_DIR="../sts-2.1.2"
-NIST_BIN="$NIST_DIR/assess"
+Both implementations support files of any size (streaming processing)
 
-if [ ! -f "$NIST_BIN" ]; then
-    echo "Error: NIST STS not found at $NIST_DIR"
-    echo "Please download and compile NIST STS first:"
-    echo "1. Download from https://csrc.nist.gov/projects/random-bit-generation/documentation-and-software"
-    echo "2. Extract to sts-2.1.2 directory in project root"
-    echo "3. Run 'make' in the sts-2.1.2 directory"
-    exit 1
-fi
+All hash functions pass NIST test vectors
 
-echo "✓ NIST STS found"
+License
+This project is for educational purposes as part of a cryptography course.
 
-# Generate test data if not exists
-TEST_DATA="nist_test_data.bin"
-if [ ! -f "$TEST_DATA" ]; then
-    echo "Generating test data..."
-    ./bin/test_csprng
-fi
+Acknowledgments
+NIST for cryptographic standards
 
-if [ ! -f "$TEST_DATA" ]; then
-    echo "Error: Failed to generate test data"
-    exit 1
-fi
+OpenSSL project for cryptographic libraries
 
-echo "✓ Test data ready: $TEST_DATA ($(stat -c%s "$TEST_DATA") bytes)"
-
-# Run NIST tests
-echo "Running NIST Statistical Test Suite..."
-cd "$NIST_DIR"
-
-# Create assessment configuration
-cat > assess_config.txt << EOF
-$TEST_DATA
-0
-1
-1000000
-EOF
-
-./assess 1000000 < assess_config.txt
-
-echo ""
-echo "=== NIST Tests Complete ==="
-echo "Results available in: $NIST_DIR/experiments/AlgorithmTesting/finalAnalysisReport.txt"
-echo "Summary of results:"
-
-# Extract and display summary
-if [ -f "experiments/AlgorithmTesting/finalAnalysisReport.txt" ]; then
-    grep -E "(TEST|passed|failed)" "experiments/AlgorithmTesting/finalAnalysisReport.txt" | head -20
-fi
+Course instructors for guidance and requirements

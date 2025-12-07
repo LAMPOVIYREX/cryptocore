@@ -2,11 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/evp.h>
-#include <openssl/rand.h>
-#include "crypto.h"
-#include "common.h"
-#include "types.h"
-#include "csprng.h"
+
+#include "../include/crypto.h"
+#include "../include/common.h"
+#include "../include/csprng.h"
+
+
 
 // Utility functions
 int requires_padding(cipher_mode_t mode) {

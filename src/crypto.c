@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/evp.h>
-#include <openssl/rand.h>
-#include "crypto.h"
-#include "common.h"
+
+#include "../include/crypto.h"
+#include "../include/common.h"
+
+
 
 // Keep existing ECB functions but update them to use new helper functions
 unsigned char* aes_ecb_encrypt(const unsigned char* input, size_t input_len, 

@@ -1,67 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "types.h"
-#include "cli_parser.h"
-#include "csprng.h"
+#include <openssl/rand.h>
 
-void print_usage(const char* program_name) {
-    fprintf(stderr, "Usage: %s -algorithm aes -mode [ecb|cbc|cfb|ofb|ctr] (-encrypt | -decrypt) [-key HEX_KEY] -input INPUT_FILE [-output OUTPUT_FILE] [-iv HEX_IV]\n", program_name);
-    fprintf(stderr, "Examples:\n");
-    fprintf(stderr, "  Encryption with generated key: %s -algorithm aes -mode cbc -encrypt -input plain.txt -output cipher.bin\n", program_name);
-    fprintf(stderr, "  Encryption with specific key: %s -algorithm aes -mode cbc -encrypt -key 00112233445566778899aabbccddeeff -input plain.txt -output cipher.bin\n", program_name);
-    fprintf(stderr, "  Decryption: %s -algorithm aes -mode cbc -decrypt -key 00112233445566778899aabbccddeeff -iv aabbccddeeff00112233445566778899 -input cipher.bin -output decrypted.txt\n", program_name);
-    fprintf(stderr, "Supported modes: ecb, cbc, cfb, ofb, ctr\n");
-    fprintf(stderr, "Note: For encryption, -key is optional. If omitted, a secure random key will be generated and displayed.\n");
-    fprintf(stderr, "Key and IV should be provided as hexadecimal strings WITHOUT @ prefix.\n");
-}
+#include "../include/cli_parser.h"
+#include "../include/csprng.h"
+#include "../include/common.h"
+#include "../include/hash.h"
 
-cipher_mode_t parse_cipher_mode(const char* mode_str) {
-    if (strcmp(mode_str, "ecb") == 0) return CIPHER_MODE_ECB;
-    if (strcmp(mode_str, "cbc") == 0) return CIPHER_MODE_CBC;
-    if (strcmp(mode_str, "cfb") == 0) return CIPHER_MODE_CFB;
-    if (strcmp(mode_str, "ofb") == 0) return CIPHER_MODE_OFB;
-    if (strcmp(mode_str, "ctr") == 0) return CIPHER_MODE_CTR;
-    return CIPHER_MODE_UNKNOWN;
-}
-
-int hex_to_bytes(const char* hex_str, unsigned char** bytes, size_t* len) {
-    // Убрана проверка на @ - теперь ключи и IV принимаются без префикса
-    size_t hex_len = strlen(hex_str);
-    
-    if (hex_len == 0 || hex_len % 2 != 0) {
-        fprintf(stderr, "Error: Hexadecimal value must have even number of digits\n");
-        return 0;
-    }
-    
-    *len = hex_len / 2;
-    *bytes = malloc(*len);
-    if (*bytes == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed\n");
-        return 0;
-    }
-    
-    for (size_t i = 0; i < *len; i++) {
-        if (sscanf(hex_str + 2*i, "%2hhx", &(*bytes)[i]) != 1) {
-            fprintf(stderr, "Error: Invalid hexadecimal character at position %zu\n", 2*i);
-            free(*bytes);
-            *bytes = NULL;
-            return 0;
-        }
-    }
-    
-    return 1;
-}
-
-int parse_arguments(int argc, char* argv[], cli_args_t* args) {
-    memset(args, 0, sizeof(cli_args_t));
-    args->operation = MODE_UNKNOWN;
-    args->mode = CIPHER_MODE_UNKNOWN;
-    
+// Функция для парсинга аргументов шифрования/дешифрования
+static int parse_crypto_arguments(int argc, char* argv[], cli_args_t* args) {
     int encrypt_flag = 0;
     int decrypt_flag = 0;
     char* mode_str = NULL;
     
+    // Начинаем с i = 1, так как argv[0] это имя программы
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-algorithm") == 0 && i + 1 < argc) {
             args->algorithm = malloc(strlen(argv[i+1]) + 1);
@@ -114,40 +67,41 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
     
     // Parse cipher mode
     if (mode_str) {
-        args->mode = parse_cipher_mode(mode_str);
+        args->cipher_mode = parse_cipher_mode(mode_str);
         free(mode_str);
     }
     
-    // Set operation mode based on flags
+    // Set operation based on flags
     if (encrypt_flag && decrypt_flag) {
         fprintf(stderr, "Error: Cannot specify both -encrypt and -decrypt\n");
         return 0;
     }
     else if (encrypt_flag) {
-        args->operation = MODE_ENCRYPT;
+        // Устанавливаем режим шифрования
+        // (operation_mode уже установлен в MODE_ENCRYPT_DECRYPT)
     }
     else if (decrypt_flag) {
-        args->operation = MODE_DECRYPT;
+        // Устанавливаем режим дешифрования
+        // (operation_mode уже установлен в MODE_ENCRYPT_DECRYPT)
+    }
+    else {
+        fprintf(stderr, "Error: Must specify either -encrypt or -decrypt for crypto mode\n");
+        return 0;
     }
     
     // Validation
     if (args->algorithm == NULL || strcmp(args->algorithm, "aes") != 0) {
-        fprintf(stderr, "Error: Algorithm must be 'aes'\n");
+        fprintf(stderr, "Error: Algorithm must be 'aes' for crypto mode\n");
         return 0;
     }
     
-    if (args->mode == CIPHER_MODE_UNKNOWN) {
+    if (args->cipher_mode == CIPHER_MODE_UNKNOWN) {
         fprintf(stderr, "Error: Mode must be one of: ecb, cbc, cfb, ofb, ctr\n");
         return 0;
     }
     
-    if (args->operation == MODE_UNKNOWN) {
-        fprintf(stderr, "Error: Must specify either -encrypt or -decrypt\n");
-        return 0;
-    }
-    
     // KEY VALIDATION - UPDATED FOR MILESTONE 3
-    if (args->operation == MODE_ENCRYPT && args->key == NULL) {
+    if (encrypt_flag && args->key == NULL) {
         // Генерируем случайный ключ
         char* generated_key_hex = generate_random_key_hex(16);
         if (generated_key_hex == NULL) {
@@ -163,17 +117,17 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
         
         // Сохраняем hex представление для вывода пользователю
         args->generated_key_hex = generated_key_hex;
-    } else if (args->key == NULL) {
+    } else if (decrypt_flag && args->key == NULL) {
         // Для дешифрования ключ обязателен
         fprintf(stderr, "Error: Key is required for decryption\n");
         return 0;
-    } else if (args->key_len != 16) {
+    } else if (args->key != NULL && args->key_len != 16) {
         fprintf(stderr, "Error: Key must be 16 bytes for AES-128\n");
         return 0;
     }
     
     // Проверка на слабые ключи (дополнительное требование)
-    if (args->key != NULL && args->operation == MODE_ENCRYPT && args->generated_key_hex == NULL) {
+    if (args->key != NULL && encrypt_flag && args->generated_key_hex == NULL) {
         int is_weak = 1;
         // Проверяем, не все ли байты одинаковые
         for (size_t i = 1; i < args->key_len; i++) {
@@ -207,14 +161,14 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
     }
     
     // IV validation
-    if (args->operation == MODE_ENCRYPT && args->iv_provided) {
+    if (encrypt_flag && args->iv_provided) {
         fprintf(stderr, "Warning: IV provided during encryption will be ignored (using random IV)\n");
         free(args->iv);
         args->iv = NULL;
         args->iv_provided = 0;
     }
     
-    if (args->operation == MODE_DECRYPT && args->mode != CIPHER_MODE_ECB && !args->iv_provided) {
+    if (decrypt_flag && args->cipher_mode != CIPHER_MODE_ECB && !args->iv_provided) {
         fprintf(stderr, "Warning: No IV provided for decryption, will read from file\n");
     }
     
@@ -225,7 +179,7 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
     
     if (args->output_file == NULL) {
         // Generate default output filename
-        const char* extension = (args->operation == MODE_ENCRYPT) ? ".enc" : ".dec";
+        const char* extension = (encrypt_flag) ? ".enc" : ".dec";
         size_t len = strlen(args->input_file) + strlen(extension) + 1;
         args->output_file = malloc(len);
         if (args->output_file) {
@@ -236,6 +190,115 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
     return 1;
 }
 
+// Функция для парсинга аргументов хеширования
+static int parse_digest_arguments(int argc, char* argv[], cli_args_t* args) {
+    int i = 2; // Пропускаем "cryptocore" и "dgst"
+    
+    for (; i < argc; i++) {
+        if (strcmp(argv[i], "--algorithm") == 0 && i + 1 < argc) {
+            args->hash_algorithm = parse_hash_algorithm(argv[i + 1]);
+            if (args->hash_algorithm == HASH_UNKNOWN) {
+                fprintf(stderr, "Error: Unknown hash algorithm '%s'. Supported: sha256, sha3-256\n", argv[i + 1]);
+                return 0;
+            }
+            i++;
+        }
+        else if (strcmp(argv[i], "--input") == 0 && i + 1 < argc) {
+            args->input_file = malloc(strlen(argv[i + 1]) + 1);
+            if (args->input_file) strcpy(args->input_file, argv[i + 1]);
+            i++;
+        }
+        else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
+            args->output_file = malloc(strlen(argv[i + 1]) + 1);
+            if (args->output_file) strcpy(args->output_file, argv[i + 1]);
+            i++;
+        }
+        else {
+            fprintf(stderr, "Error: Unknown argument '%s' for dgst command\n", argv[i]);
+            return 0;
+        }
+    }
+    
+    // Валидация
+    if (args->hash_algorithm == HASH_UNKNOWN) {
+        fprintf(stderr, "Error: Hash algorithm is required (--algorithm sha256|sha3-256)\n");
+        return 0;
+    }
+    
+    if (args->input_file == NULL) {
+        fprintf(stderr, "Error: Input file is required (--input FILE)\n");
+        return 0;
+    }
+    
+    return 1;
+}
+
+void print_usage(const char* program_name) {
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "  Encryption/Decryption:\n");
+    fprintf(stderr, "    %s -algorithm aes -mode [ecb|cbc|cfb|ofb|ctr] (-encrypt | -decrypt) [-key HEX_KEY] -input INPUT_FILE [-output OUTPUT_FILE] [-iv HEX_IV]\n", program_name);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  Hashing:\n");
+    fprintf(stderr, "    %s dgst --algorithm [sha256|sha3-256] --input INPUT_FILE [--output OUTPUT_FILE]\n", program_name);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Examples:\n");
+    fprintf(stderr, "  Encryption with generated key: %s -algorithm aes -mode cbc -encrypt -input plain.txt -output cipher.bin\n", program_name);
+    fprintf(stderr, "  Hashing: %s dgst --algorithm sha256 --input document.pdf\n", program_name);
+}
+
+cipher_mode_t parse_cipher_mode(const char* mode_str) {
+    if (strcmp(mode_str, "ecb") == 0) return CIPHER_MODE_ECB;
+    if (strcmp(mode_str, "cbc") == 0) return CIPHER_MODE_CBC;
+    if (strcmp(mode_str, "cfb") == 0) return CIPHER_MODE_CFB;
+    if (strcmp(mode_str, "ofb") == 0) return CIPHER_MODE_OFB;
+    if (strcmp(mode_str, "ctr") == 0) return CIPHER_MODE_CTR;
+    return CIPHER_MODE_UNKNOWN;
+}
+
+int hex_to_bytes(const char* hex_str, unsigned char** bytes, size_t* len) {
+    // Убрана проверка на @ - теперь ключи и IV принимаются без префикса
+    size_t hex_len = strlen(hex_str);
+    
+    if (hex_len == 0 || hex_len % 2 != 0) {
+        fprintf(stderr, "Error: Hexadecimal value must have even number of digits\n");
+        return 0;
+    }
+    
+    *len = hex_len / 2;
+    *bytes = malloc(*len);
+    if (*bytes == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        return 0;
+    }
+    
+    for (size_t i = 0; i < *len; i++) {
+        if (sscanf(hex_str + 2*i, "%2hhx", &(*bytes)[i]) != 1) {
+            fprintf(stderr, "Error: Invalid hexadecimal character at position %zu\n", 2*i);
+            free(*bytes);
+            *bytes = NULL;
+            return 0;
+        }
+    }
+    
+    return 1;
+}
+
+int parse_arguments(int argc, char* argv[], cli_args_t* args) {
+    memset(args, 0, sizeof(cli_args_t));
+    args->operation_mode = MODE_UNKNOWN;
+    args->cipher_mode = CIPHER_MODE_UNKNOWN;
+    args->hash_algorithm = HASH_UNKNOWN;
+    
+    // Проверяем, есть ли подкоманда dgst
+    if (argc > 1 && strcmp(argv[1], "dgst") == 0) {
+        args->operation_mode = MODE_DIGEST;
+        return parse_digest_arguments(argc, argv, args);
+    } else {
+        args->operation_mode = MODE_ENCRYPT_DECRYPT;
+        return parse_crypto_arguments(argc, argv, args);
+    }
+}
+
 void free_cli_args(cli_args_t* args) {
     if (args->algorithm) free(args->algorithm);
     if (args->key) free(args->key);
@@ -243,4 +306,5 @@ void free_cli_args(cli_args_t* args) {
     if (args->output_file) free(args->output_file);
     if (args->iv) free(args->iv);
     if (args->generated_key_hex) free(args->generated_key_hex);
+    if (args->verify_file) free(args->verify_file);
 }

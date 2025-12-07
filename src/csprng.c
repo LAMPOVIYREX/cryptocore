@@ -2,7 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/rand.h>
-#include "csprng.h"
+
+#include "../include/csprng.h"
+
+
 
 int generate_random_bytes(unsigned char *buffer, size_t num_bytes) {
     if (buffer == NULL || num_bytes == 0) {

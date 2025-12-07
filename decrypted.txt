@@ -1,1 +1,1 @@
-dadudu
+Hello, this is a secret message for encryption test!
