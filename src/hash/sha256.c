@@ -45,13 +45,7 @@ void sha256_init(SHA256_CTX *ctx) {
     memset(ctx->buffer, 0, SHA256_BUF_SIZE);
 }
 
-// Преобразование big-endian
-static uint32_t bswap_32(uint32_t x) {
-    return ((x & 0xFF000000) >> 24) |
-           ((x & 0x00FF0000) >> 8) |
-           ((x & 0x0000FF00) << 8) |
-           ((x & 0x000000FF) << 24);
-}
+
 
 // Обработка одного блока (512 бит = 64 байта)
 static void sha256_transform(SHA256_CTX *ctx, const unsigned char data[SHA256_BUF_SIZE]) {

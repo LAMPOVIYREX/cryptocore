@@ -13,4 +13,8 @@ typedef enum {
 hash_algorithm_t parse_hash_algorithm(const char *algorithm_str);
 char* compute_hash(hash_algorithm_t algorithm, const char *filename);
 
+// Add these declarations if they don't exist:
+char* sha256_hex(const unsigned char *data, size_t len);
+char* sha3_256_hex(const unsigned char *data, size_t len);
+
 #endif

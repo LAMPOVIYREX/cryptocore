@@ -1,301 +1,230 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -O2 -I./include -I./include/hash
+CFLAGS = -Wall -Wextra -std=c99 -O2 -I./include -I./include/hash -I./include/mac -I./include/modes
 LDFLAGS = -lcrypto -lssl
 
-# Основные директории
+# Disable all built-in rules
+MAKEFLAGS += -r
+
+# Main directories
 SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
-INC_DIR = include
-HASH_INC_DIR = include/hash
 
-# Директории для тестов
-TEST_SRC_DIR = tests/src
-TEST_BIN_DIR = tests/bin
-TEST_OBJ_DIR = obj/tests
-TEST_DATA_DIR = tests/data
-TEST_SCRIPTS_DIR = tests/scripts
-TEST_RESULTS_DIR = tests/results
+# Source files (explicitly list all source files)
+MAIN_SRCS = $(SRC_DIR)/aead.c $(SRC_DIR)/cli_parser.c $(SRC_DIR)/crypto.c \
+            $(SRC_DIR)/csprng.c $(SRC_DIR)/file_io.c $(SRC_DIR)/hash.c \
+            $(SRC_DIR)/main.c $(SRC_DIR)/modes.c
 
-# Основные исходные файлы (существующие)
-MAIN_SRCS = $(wildcard $(SRC_DIR)/*.c)
 MODE_SRCS = $(wildcard $(SRC_DIR)/modes/*.c)
 HASH_SRCS = $(wildcard $(SRC_DIR)/hash/*.c)
+MAC_SRCS = $(wildcard $(SRC_DIR)/mac/*.c)
 
-# Все исходные файлы
-ALL_SRCS = $(MAIN_SRCS) $(MODE_SRCS) $(HASH_SRCS)
-
-# Объектные файлы
+# Object files
 MAIN_OBJS = $(MAIN_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 MODE_OBJS = $(MODE_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 HASH_OBJS = $(HASH_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+MAC_OBJS = $(MAC_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
-# Все объектные файлы
-OBJS = $(MAIN_OBJS) $(MODE_OBJS) $(HASH_OBJS)
+# All object files
+OBJS = $(MAIN_OBJS) $(MODE_OBJS) $(HASH_OBJS) $(MAC_OBJS)
 
-# Целевой бинарник
+# Target binary
 TARGET = $(BIN_DIR)/cryptocore
 
-# Тестовые файлы
-TEST_SRCS = $(wildcard $(TEST_SRC_DIR)/*.c)
-TEST_OBJS = $(TEST_SRCS:$(TEST_SRC_DIR)/%.c=$(TEST_OBJ_DIR)/%.o)
-TEST_TARGETS = $(TEST_BIN_DIR)/test_csprng $(TEST_BIN_DIR)/test_roundtrip $(TEST_BIN_DIR)/test_hash $(TEST_BIN_DIR)/test_hash_requirements
+# Test binaries
+TEST_HMAC_BIN = $(BIN_DIR)/test_hmac_vectors
+TEST_HASH_BIN = $(BIN_DIR)/test_hash
+TEST_ROUNDTRIP_BIN = $(BIN_DIR)/test_roundtrip
+TEST_CSPRNG_BIN = $(BIN_DIR)/test_csprng
+TEST_HASH_REQ_BIN = $(BIN_DIR)/test_hash_requirements
+TEST_GCM_BIN = $(BIN_DIR)/test_gcm_vectors
 
-# Имена отдельных тестовых целей
-TEST_CSPRNG_SRC = $(TEST_SRC_DIR)/test_csprng.c
-TEST_CSPRNG_OBJ = $(TEST_OBJ_DIR)/test_csprng.o
-TEST_CSPRNG_TARGET = $(TEST_BIN_DIR)/test_csprng
-
-TEST_ROUNDTRIP_SRC = $(TEST_SRC_DIR)/test_roundtrip.c
-TEST_ROUNDTRIP_OBJ = $(TEST_OBJ_DIR)/test_roundtrip.o
-TEST_ROUNDTRIP_TARGET = $(TEST_BIN_DIR)/test_roundtrip
-
-TEST_HASH_SRC = $(TEST_SRC_DIR)/test_hash.c
-TEST_HASH_OBJ = $(TEST_OBJ_DIR)/test_hash.o
-TEST_HASH_TARGET = $(TEST_BIN_DIR)/test_hash
-
+# Test source files
+TEST_HMAC_SRC = tests/src/test_hmac_vectors.c
+TEST_HASH_SRC = tests/src/test_hash.c
+TEST_ROUNDTRIP_SRC = tests/src/test_roundtrip.c
+TEST_CSPRNG_SRC = tests/src/test_csprng.c
 TEST_HASH_REQ_SRC = tests/src/test_hash_requirements.c
-TEST_HASH_REQ_OBJ = obj/tests/test_hash_requirements.o
-TEST_HASH_REQ_TARGET = tests/bin/test_hash_requirements
+TEST_GCM_SRC = tests/src/test_gcm_vectors.c
 
-# Основные объектные файлы без main.o (для линковки тестов)
-MAIN_OBJ = $(OBJ_DIR)/main.o
-LIB_OBJS = $(filter-out $(MAIN_OBJ), $(OBJS))
+# Test object files
+TEST_HMAC_OBJ = $(TEST_HMAC_SRC:tests/src/%.c=$(OBJ_DIR)/tests/%.o)
+TEST_HASH_OBJ = $(TEST_HASH_SRC:tests/src/%.c=$(OBJ_DIR)/tests/%.o)
+TEST_ROUNDTRIP_OBJ = $(TEST_ROUNDTRIP_SRC:tests/src/%.c=$(OBJ_DIR)/tests/%.o)
+TEST_CSPRNG_OBJ = $(TEST_CSPRNG_SRC:tests/src/%.c=$(OBJ_DIR)/tests/%.o)
+TEST_HASH_REQ_OBJ = $(TEST_HASH_REQ_SRC:tests/src/%.c=$(OBJ_DIR)/tests/%.o)
+TEST_GCM_OBJ = $(TEST_GCM_SRC:tests/src/%.c=$(OBJ_DIR)/tests/%.o)
 
 # Phony targets
-.PHONY: all clean install-dependencies test test_build run_tests \
-        nist_test csprng_test roundtrip_test hash_test hash_req_test help
+.PHONY: all clean install-dependencies test test_hmac test_hash test_roundtrip test_csprng test_hash_req test_gcm test_all help test_gcm_build
 
 # Default target
-all: $(TARGET) test_build
+all: $(TARGET)
 
 help:
 	@echo "Available targets:"
-	@echo "  all              - Build main binary and tests (default)"
-	@echo "  $(TARGET)        - Build only main binary"
-	@echo "  test_build       - Build only test binaries"
-	@echo "  test             - Run all unit tests"
-	@echo "  hash_test        - Run only basic hash function tests"
-	@echo "  hash_req_test    - Run hash requirements tests (avalanche, interoperability)"
-	@echo "  run_tests        - Run all tests (unit + integration)"
-	@echo "  csprng_test      - Run only CSPRNG tests"
-	@echo "  roundtrip_test   - Run only round-trip tests"
-	@echo "  nist_test        - Generate data for NIST tests"
-	@echo "  clean            - Remove all build artifacts"
-	@echo "  install-dependencies - Install required dependencies"
-	@echo "  help             - Show this help message"
+	@echo "  all                     - Build main binary (default)"
+	@echo "  clean                   - Remove all build artifacts"
+	@echo "  clean_tests             - Remove test binaries only"
+	@echo "  clean_all               - Remove all build artifacts and tests"
+	@echo "  install-dependencies    - Install required dependencies"
+	@echo "  test                    - Run all unit tests"
+	@echo "  test_hmac               - Run HMAC unit tests"
+	@echo "  test_hash               - Run hash function unit tests"
+	@echo "  test_hash_req           - Run hash requirements tests"
+	@echo "  test_roundtrip          - Run round-trip encryption tests"
+	@echo "  test_csprng             - Run CSPRNG tests"
+	@echo "  test_gcm                - Run GCM tests"
+	@echo "  test_hmac_build         - Build HMAC test binary"
+	@echo "  test_hash_build         - Build hash test binary"
+	@echo "  test_roundtrip_build    - Build round-trip test binary"
+	@echo "  test_csprng_build       - Build CSPRNG test binary"
+	@echo "  test_hash_req_build     - Build hash requirements test binary"
+	@echo "  test_gcm_build          - Build GCM test binary"
+	@echo "  test_all                - Run all tests (unit + integration)"
+	@echo "  help                    - Show this help message"
 
-# Основной бинарник
+# Main binary
 $(TARGET): $(OBJS) | $(BIN_DIR)
 	$(CC) $(OBJS) -o $@ $(LDFLAGS)
 	@echo "✓ Built main binary: $@"
 
-# Правило для основных объектных файлов
+# Generic rule for all .c files in src root
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 	@echo "  Compiled: $<"
 
-# Правило для hash объектных файлов
-$(OBJ_DIR)/hash/%.o: $(SRC_DIR)/hash/%.c | $(OBJ_DIR)/hash
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
-	@echo "  Compiled: $<"
-
-# Правило для modes объектных файлов
+# Special rule for modes/ directory
 $(OBJ_DIR)/modes/%.o: $(SRC_DIR)/modes/%.c | $(OBJ_DIR)/modes
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 	@echo "  Compiled: $<"
 
-# Сборка тестовых бинарников
-test_build: $(TEST_TARGETS)
-
-$(TEST_CSPRNG_TARGET): $(TEST_CSPRNG_OBJ) $(LIB_OBJS) | $(TEST_BIN_DIR)
-	$(CC) $(TEST_CSPRNG_OBJ) $(LIB_OBJS) -o $@ $(LDFLAGS)
-	@echo "✓ Built test: $@"
-
-$(TEST_ROUNDTRIP_TARGET): $(TEST_ROUNDTRIP_OBJ) $(LIB_OBJS) | $(TEST_BIN_DIR)
-	$(CC) $(TEST_ROUNDTRIP_OBJ) $(LIB_OBJS) -o $@ $(LDFLAGS)
-	@echo "✓ Built test: $@"
-
-$(TEST_HASH_TARGET): $(TEST_HASH_OBJ) $(LIB_OBJS) | $(TEST_BIN_DIR)
-	$(CC) $(TEST_HASH_OBJ) $(LIB_OBJS) -o $@ $(LDFLAGS)
-	@echo "✓ Built test: $@"
-
-$(TEST_HASH_REQ_TARGET): $(TEST_HASH_REQ_OBJ) $(LIB_OBJS) | $(TEST_BIN_DIR)
-	$(CC) $(TEST_HASH_REQ_OBJ) $(LIB_OBJS) -o $@ $(LDFLAGS)
-	@echo "✓ Built test: $@"
-
-# Правило для тестовых объектных файлов
-$(TEST_OBJ_DIR)/%.o: $(TEST_SRC_DIR)/%.c | $(TEST_OBJ_DIR)
+# Special rule for hash/ directory  
+$(OBJ_DIR)/hash/%.o: $(SRC_DIR)/hash/%.c | $(OBJ_DIR)/hash
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
-	@echo "  Compiled test: $<"
+	@echo "  Compiled: $<"
 
-# Запуск юнит-тестов
-test: test_build
-	@echo ""
-	@echo "=== Running All Unit Tests ==="
-	@echo ""
-	@echo "1. CSPRNG Tests:"
-	@$(TEST_CSPRNG_TARGET) && echo "   ✓ CSPRNG tests passed" || (echo "   ✗ CSPRNG tests failed" && exit 1)
-	@echo ""
-	@echo "2. Round-trip Tests:"
-	@$(TEST_ROUNDTRIP_TARGET) && echo "   ✓ Round-trip tests passed" || (echo "   ✗ Round-trip tests failed" && exit 1)
-	@echo ""
-	@echo "3. Basic Hash Function Tests:"
-	@$(TEST_HASH_TARGET) && echo "   ✓ Basic hash function tests passed" || (echo "   ✗ Basic hash function tests failed" && exit 1)
-	@echo ""
-	@echo "4. Hash Requirements Tests:"
-	@$(TEST_HASH_REQ_TARGET) && echo "   ✓ Hash requirements tests passed" || (echo "   ✗ Hash requirements tests failed" && exit 1)
-	@echo ""
-	@echo "=== All unit tests passed! ==="
+# Special rule for mac/ directory
+$(OBJ_DIR)/mac/%.o: $(SRC_DIR)/mac/%.c | $(OBJ_DIR)/mac
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+	@echo "  Compiled: $<"
 
-# Отдельные тесты
-csprng_test: $(TEST_CSPRNG_TARGET)
-	@echo "=== Running CSPRNG Tests ==="
-	@$(TEST_CSPRNG_TARGET)
-
-roundtrip_test: $(TEST_ROUNDTRIP_TARGET)
-	@echo "=== Running Round-trip Tests ==="
-	@$(TEST_ROUNDTRIP_TARGET)
-
-hash_test: $(TEST_HASH_TARGET)
-	@echo "=== Running Basic Hash Function Tests ==="
-	@$(TEST_HASH_TARGET)
-
-hash_req_test: $(TEST_HASH_REQ_TARGET)
-	@echo "=== Running Hash Requirements Tests ==="
-	@$(TEST_HASH_REQ_TARGET)
-
-# Запуск всех тестов (юнит + интеграционные)
-run_tests: test_build
-	@echo ""
-	@echo "=== Running Complete Test Suite ==="
-	@echo ""
-	
-	# Юнит-тесты
-	@echo "1. Unit Tests:"
-	@$(TEST_CSPRNG_TARGET) > $(TEST_RESULTS_DIR)/csprng_test.log 2>&1 && \
-	    echo "   ✓ CSPRNG tests passed" || (echo "   ✗ CSPRNG tests failed" && cat $(TEST_RESULTS_DIR)/csprng_test.log && false)
-	@$(TEST_ROUNDTRIP_TARGET) > $(TEST_RESULTS_DIR)/roundtrip_test.log 2>&1 && \
-	    echo "   ✓ Round-trip tests passed" || (echo "   ✗ Round-trip tests failed" && cat $(TEST_RESULTS_DIR)/roundtrip_test.log && false)
-	@$(TEST_HASH_TARGET) > $(TEST_RESULTS_DIR)/hash_test.log 2>&1 && \
-	    echo "   ✓ Basic hash function tests passed" || (echo "   ✗ Basic hash function tests failed" && cat $(TEST_RESULTS_DIR)/hash_test.log && false)
-	@$(TEST_HASH_REQ_TARGET) > $(TEST_RESULTS_DIR)/hash_req_test.log 2>&1 && \
-	    echo "   ✓ Hash requirements tests passed" || (echo "   ✗ Hash requirements tests failed" && cat $(TEST_RESULTS_DIR)/hash_req_test.log && false)
-	
-	@echo ""
-	@echo "2. Integration Tests:"
-	
-	# Создаем тестовые файлы
-	@mkdir -p $(TEST_DATA_DIR)/test_files
-	@echo "Test data for integration" > $(TEST_DATA_DIR)/test_files/test1.txt
-	@echo -n "0123456789ABCDEF" > $(TEST_DATA_DIR)/test_16_bytes.txt
-	@echo -n "0123456789ABCDE" > $(TEST_DATA_DIR)/test_15_bytes.txt
-	
-	# Round-trip integration test
-	@chmod +x $(TEST_SCRIPTS_DIR)/test_roundtrip.sh 2>/dev/null || true
-	@if [ -f "$(TEST_SCRIPTS_DIR)/test_roundtrip.sh" ]; then \
-	    echo "   Running round-trip integration test..."; \
-	    $(TEST_SCRIPTS_DIR)/test_roundtrip.sh > $(TEST_RESULTS_DIR)/integration_roundtrip.log 2>&1 && \
-	    echo "   ✓ Round-trip integration test passed" || (echo "   ✗ Round-trip integration test failed" && false); \
-	else \
-	    echo "   ⚠ Round-trip integration script not found"; \
-	fi
-	
-	# Hash integration test
-	@if [ -f "$(TARGET)" ]; then \
-	    echo "   Running hash integration test..."; \
-	    echo "Test hash data" > $(TEST_DATA_DIR)/hash_test.txt; \
-	    $(TARGET) dgst --algorithm sha256 --input $(TEST_DATA_DIR)/hash_test.txt > $(TEST_RESULTS_DIR)/hash_integration.log 2>&1 && \
-	    echo "   ✓ Hash integration test passed" || (echo "   ✗ Hash integration test failed" && false); \
-	    \
-	    # Test stdin input \
-	    echo "   Testing stdin input..."; \
-	    echo -n "abc" | $(TARGET) dgst --algorithm sha256 --input - > $(TEST_RESULTS_DIR)/hash_stdin.log 2>&1 && \
-	    echo "   ✓ Stdin hash test passed" || (echo "   ✗ Stdin hash test failed" && false); \
-	else \
-	    echo "   ⚠ Main binary not found for hash integration test"; \
-	fi
-	
-	# Key generation test
-	@chmod +x $(TEST_SCRIPTS_DIR)/test_key_generation.sh 2>/dev/null || true
-	@if [ -f "$(TEST_SCRIPTS_DIR)/test_key_generation.sh" ]; then \
-	    echo "   Running key generation test..."; \
-	    $(TEST_SCRIPTS_DIR)/test_key_generation.sh > $(TEST_RESULTS_DIR)/integration_keygen.log 2>&1 && \
-	    echo "   ✓ Key generation test passed" || (echo "   ✗ Key generation test failed" && false); \
-	else \
-	    echo "   ⚠ Key generation script not found"; \
-	fi
-	
-	@echo ""
-	@echo "=== All tests completed ==="
-	@echo "Logs available in $(TEST_RESULTS_DIR)/"
-
-# Генерация данных для NIST тестов
-nist_test: $(TEST_CSPRNG_TARGET) | $(TEST_RESULTS_DIR)
-	@echo "=== Generating NIST Test Data ==="
-	@$(TEST_CSPRNG_TARGET) 2>/dev/null || true
-	@if [ -f "$(TEST_RESULTS_DIR)/nist_test_data.bin" ]; then \
-	    size=$$(stat -c%s "$(TEST_RESULTS_DIR)/nist_test_data.bin"); \
-	    echo "✓ Generated $(TEST_RESULTS_DIR)/nist_test_data.bin ($$size bytes)"; \
-	    echo ""; \
-	    echo "To run NIST STS:"; \
-	    echo "1. Download NIST STS from https://csrc.nist.gov/projects/random-bit-generation/documentation-and-software"; \
-	    echo "2. Compile: tar -xzf sts-2.1.2.tar.gz && cd sts-2.1.2 && make"; \
-	    echo "3. Run: ./assess 1000000"; \
-	    echo "4. Use $(TEST_RESULTS_DIR)/nist_test_data.bin as input"; \
-	else \
-	    echo "⚠ NIST test data not generated"; \
-	    echo "Running test manually:"; \
-	    $(TEST_CSPRNG_TARGET); \
-	fi
-
-# Установка зависимостей
-install-dependencies:
-	@echo "=== Installing Dependencies ==="
-	sudo apt-get update
-	sudo apt-get install -y build-essential libssl-dev xxd openssl
-	@echo "✓ Dependencies installed"
-
-# Создание директорий
+# Create directories
 $(OBJ_DIR):
 	@mkdir -p $(OBJ_DIR)
 	@mkdir -p $(OBJ_DIR)/hash
 	@mkdir -p $(OBJ_DIR)/modes
+	@mkdir -p $(OBJ_DIR)/mac
+	@mkdir -p $(OBJ_DIR)/tests
 	@echo "Created directory: $@"
 
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
 	@echo "Created directory: $@"
 
-$(TEST_BIN_DIR):
-	@mkdir -p $(TEST_BIN_DIR)
-	@echo "Created directory: $@"
+# Install dependencies
+install-dependencies:
+	@echo "=== Installing Dependencies ==="
+	sudo apt-get update
+	sudo apt-get install -y build-essential libssl-dev xxd openssl
+	@echo "✓ Dependencies installed"
 
-$(TEST_OBJ_DIR):
-	@mkdir -p $(TEST_OBJ_DIR)
-	@echo "Created directory: $@"
-
-$(TEST_RESULTS_DIR):
-	@mkdir -p $(TEST_RESULTS_DIR)
-	@echo "Created directory: $@"
-
-# Очистка
+# Clean
 clean:
 	@echo "=== Cleaning Build Artifacts ==="
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
-	rm -rf $(TEST_OBJ_DIR) $(TEST_BIN_DIR)
-	rm -f $(TEST_RESULTS_DIR)/*.log $(TEST_RESULTS_DIR)/nist_test_data.bin 2>/dev/null || true
-	rm -f $(TEST_DATA_DIR)/*.enc $(TEST_DATA_DIR)/*.dec $(TEST_DATA_DIR)/test_*.txt 2>/dev/null || true
-	rm -f $(TEST_DATA_DIR)/test_files/*.enc $(TEST_DATA_DIR)/test_files/*.dec 2>/dev/null || true
-	rm -f $(TEST_DATA_DIR)/hash_test.txt 2>/dev/null || true
 	@echo "✓ Cleaned all build artifacts"
 
-# Автоматическое создание директорий перед сборкой
-$(OBJS): | $(OBJ_DIR)
-$(TEST_OBJS): | $(TEST_OBJ_DIR)
-$(TARGET): | $(BIN_DIR)
-$(TEST_TARGETS): | $(TEST_BIN_DIR)
+# Test targets
+test_hmac_build: $(TEST_HMAC_BIN)
+test_hash_build: $(TEST_HASH_BIN)
+test_roundtrip_build: $(TEST_ROUNDTRIP_BIN)
+test_csprng_build: $(TEST_CSPRNG_BIN)
+test_hash_req_build: $(TEST_HASH_REQ_BIN)
+test_gcm_build: $(TEST_GCM_BIN)
+
+$(TEST_HMAC_BIN): $(TEST_HMAC_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJS))
+	@mkdir -p $(BIN_DIR)
+	$(CC) $^ -o $@ $(LDFLAGS)
+	@echo "✓ Built HMAC test binary: $@"
+
+$(TEST_HASH_BIN): $(TEST_HASH_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJS))
+	@mkdir -p $(BIN_DIR)
+	$(CC) $^ -o $@ $(LDFLAGS)
+	@echo "✓ Built hash test binary: $@"
+
+$(TEST_ROUNDTRIP_BIN): $(TEST_ROUNDTRIP_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJS))
+	@mkdir -p $(BIN_DIR)
+	$(CC) $^ -o $@ $(LDFLAGS)
+	@echo "✓ Built round-trip test binary: $@"
+
+$(TEST_CSPRNG_BIN): $(TEST_CSPRNG_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJS))
+	@mkdir -p $(BIN_DIR)
+	$(CC) $^ -o $@ $(LDFLAGS)
+	@echo "✓ Built CSPRNG test binary: $@"
+
+$(TEST_HASH_REQ_BIN): $(TEST_HASH_REQ_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJS))
+	@mkdir -p $(BIN_DIR)
+	$(CC) $^ -o $@ $(LDFLAGS)
+	@echo "✓ Built hash requirements test binary: $@"
+
+$(TEST_GCM_BIN): $(TEST_GCM_OBJ) $(filter-out $(OBJ_DIR)/main.o, $(OBJS))
+	@mkdir -p $(BIN_DIR)
+	$(CC) $^ -o $@ $(LDFLAGS)
+	@echo "✓ Built GCM test binary: $@"
+
+# Rule for test object files
+$(OBJ_DIR)/tests/%.o: tests/src/%.c | $(OBJ_DIR)/tests
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+	@echo "  Compiled test: $<"
+
+$(OBJ_DIR)/tests:
+	@mkdir -p $@
+
+# Run tests
+test_hmac: test_hmac_build
+	@echo "=== Running HMAC Tests ==="
+	$(TEST_HMAC_BIN)
+
+test_hash: test_hash_build
+	@echo "=== Running Hash Tests ==="
+	$(TEST_HASH_BIN)
+
+test_hash_req: test_hash_req_build
+	@echo "=== Running Hash Requirements Tests ==="
+	$(TEST_HASH_REQ_BIN)
+
+test_roundtrip: test_roundtrip_build
+	@echo "=== Running Round-trip Tests ==="
+	$(TEST_ROUNDTRIP_BIN)
+
+test_csprng: test_csprng_build
+	@echo "=== Running CSPRNG Tests ==="
+	$(TEST_CSPRNG_BIN)
+
+test_gcm: test_gcm_build
+	@echo "=== Running GCM Tests ==="
+	$(TEST_GCM_BIN)
+
+test: test_hash test_hash_req test_roundtrip test_csprng test_hmac test_gcm
+	@echo ""
+	@echo "=== All Unit Tests Passed! ==="
+
+test_all: test
+	@echo "=== Running Integration Tests ==="
+	cd tests/scripts && ./run_all_tests.sh
+
+# Clean test files
+clean_tests:
+	@echo "=== Cleaning Test Binaries ==="
+	rm -f $(TEST_HMAC_BIN) $(TEST_HASH_BIN) $(TEST_ROUNDTRIP_BIN) $(TEST_CSPRNG_BIN) $(TEST_HASH_REQ_BIN) $(TEST_GCM_BIN)
+	rm -rf $(OBJ_DIR)/tests
+	@echo "✓ Cleaned test binaries"
+
+clean_all: clean clean_tests
+	@echo "✓ Cleaned all build artifacts and tests"

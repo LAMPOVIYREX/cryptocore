@@ -9,10 +9,129 @@
 #include "../include/common.h"
 #include "../include/hash.h"
 #include "../include/csprng.h"
+#include "../include/mac/hmac.h"
+#include "../include/modes/gcm.h"
 
-// Вспомогательная функция для обработки шифрования/дешифрования
+// Forward declarations
+static int handle_gcm_operation(cli_args_t* args, int is_encrypt);
+static unsigned char* read_file_from_stdin(size_t* file_size);
+
+// Helper function to read from stdin
+static unsigned char* read_file_from_stdin(size_t* file_size) {
+    size_t buffer_size = 4096;
+    unsigned char* buffer = malloc(buffer_size);
+    if (!buffer) return NULL;
+    
+    size_t total_read = 0;
+    size_t bytes_read;
+    
+    while ((bytes_read = fread(buffer + total_read, 1, buffer_size - total_read, stdin)) > 0) {
+        total_read += bytes_read;
+        
+        if (total_read == buffer_size) {
+            buffer_size *= 2;
+            unsigned char* new_buffer = realloc(buffer, buffer_size);
+            if (!new_buffer) {
+                free(buffer);
+                return NULL;
+            }
+            buffer = new_buffer;
+        }
+    }
+    
+    *file_size = total_read;
+    return buffer;
+}
+
+// Function to handle GCM operations
+static int handle_gcm_operation(cli_args_t* args, int is_encrypt) {
+    // Read input file
+    size_t input_size;
+    unsigned char* input_data = read_file(args->input_file, &input_size);
+    if (input_data == NULL) {
+        return 0;
+    }
+    
+    int result = 0;
+    
+    if (is_encrypt) {
+        // Generate random nonce (12 bytes for GCM)
+        unsigned char nonce[GCM_IV_SIZE];
+        if (generate_random_bytes(nonce, GCM_IV_SIZE) != 0) {
+            fprintf(stderr, "Error: Failed to generate nonce\n");
+            free(input_data);
+            return 0;
+        }
+        
+        unsigned char* output = NULL;
+        size_t output_len = 0;
+        
+        // Use default empty AAD if not provided
+        const unsigned char* aad = (args->aad != NULL) ? args->aad : (unsigned char*)"";
+        size_t aad_len = (args->aad != NULL) ? args->aad_len : 0;
+        
+        if (gcm_encrypt_full(args->key, args->key_len,
+                            nonce, GCM_IV_SIZE,
+                            input_data, input_size,
+                            aad, aad_len,
+                            &output, &output_len)) {
+            
+            // Write nonce + ciphertext + tag to output file
+            if (write_file(args->output_file, output, output_len)) {
+                printf("Success: %s -> %s\n", args->input_file, args->output_file);
+                printf("Generated nonce: ");
+                for (int i = 0; i < GCM_IV_SIZE; i++) {
+                    printf("%02x", nonce[i]);
+                }
+                printf("\n");
+                if (aad_len > 0) {
+                    printf("AAD used: ");
+                    for (size_t i = 0; i < aad_len; i++) {
+                        printf("%02x", aad[i]);
+                    }
+                    printf("\n");
+                }
+                result = 1;
+            }
+            free(output);
+        } else {
+            fprintf(stderr, "Error: GCM encryption failed\n");
+        }
+    } else {
+        // Decryption
+        unsigned char* output = NULL;
+        size_t output_len = 0;
+        
+        // Use default empty AAD if not provided
+        const unsigned char* aad = (args->aad != NULL) ? args->aad : (unsigned char*)"";
+        size_t aad_len = (args->aad != NULL) ? args->aad_len : 0;
+        
+        if (gcm_decrypt_full(args->key, args->key_len,
+                            input_data, input_size,
+                            aad, aad_len,
+                            &output, &output_len)) {
+            
+            if (output && write_file(args->output_file, output, output_len)) {
+                printf("Success: %s -> %s\n", args->input_file, args->output_file);
+                result = 1;
+            } else if (!output) {
+                fprintf(stderr, "[ERROR] Decryption returned NULL output\n");
+            }
+            if (output) free(output);
+        } else {
+            fprintf(stderr, "[ERROR] Authentication failed: AAD mismatch or ciphertext tampered\n");
+            // НЕ создавать output файл вообще!
+            remove(args->output_file);
+        }
+    }
+    
+    free(input_data);
+    return result;
+}
+
+// Helper function for crypto operations
 static int handle_crypto_operation(cli_args_t* args, int is_encrypt) {
-    // Выводим сгенерированный ключ если он был создан
+    // Print generated key if it was created
     if (args->generated_key_hex != NULL) {
         printf("Generated random key: %s\n", args->generated_key_hex);
     }
@@ -32,17 +151,16 @@ static int handle_crypto_operation(cli_args_t* args, int is_encrypt) {
     
     if (is_encrypt) {
         // Generate random IV for modes that need it
-        if (args->cipher_mode != CIPHER_MODE_ECB) {
+        if (args->cipher_mode != CIPHER_MODE_ECB && args->cipher_mode != CIPHER_MODE_GCM) {
             if (generate_random_bytes(iv, 16) == 0) {
-                iv_ptr = iv;
-            } else {
                 fprintf(stderr, "Error: Failed to generate IV\n");
                 free(input_data);
                 return 0;
             }
+            iv_ptr = iv;
         }
     } else { // DECRYPT
-        if (args->cipher_mode != CIPHER_MODE_ECB) {
+        if (args->cipher_mode != CIPHER_MODE_ECB && args->cipher_mode != CIPHER_MODE_GCM) {
             if (args->iv_provided) {
                 // Use provided IV
                 iv_ptr = args->iv;
@@ -102,6 +220,8 @@ static int handle_crypto_operation(cli_args_t* args, int is_encrypt) {
                 output_data = aes_ctr_decrypt(input_data + data_start, data_size, args->key, iv_ptr, &output_size);
             }
             break;
+        case CIPHER_MODE_GCM:
+            return handle_gcm_operation(args, is_encrypt);
         default:
             fprintf(stderr, "Error: Unsupported mode\n");
             free(input_data);
@@ -116,7 +236,7 @@ static int handle_crypto_operation(cli_args_t* args, int is_encrypt) {
     }
     
     // Prepare final output (with IV for encryption)
-    if (is_encrypt && args->cipher_mode != CIPHER_MODE_ECB && iv_ptr != NULL) {
+    if (is_encrypt && args->cipher_mode != CIPHER_MODE_ECB && args->cipher_mode != CIPHER_MODE_GCM && iv_ptr != NULL) {
         final_size = 16 + output_size;
         final_output = malloc(final_size);
         if (final_output) {
@@ -143,7 +263,7 @@ static int handle_crypto_operation(cli_args_t* args, int is_encrypt) {
     printf("Success: %s -> %s\n", args->input_file, args->output_file);
     
     // Print IV info for encryption
-    if (is_encrypt && args->cipher_mode != CIPHER_MODE_ECB && iv_ptr != NULL) {
+    if (is_encrypt && args->cipher_mode != CIPHER_MODE_ECB && args->cipher_mode != CIPHER_MODE_GCM && iv_ptr != NULL) {
         printf("Generated IV: ");
         for (int i = 0; i < 16; i++) {
             printf("%02x", iv_ptr[i]);
@@ -155,6 +275,138 @@ static int handle_crypto_operation(cli_args_t* args, int is_encrypt) {
     return 1;
 }
 
+// Function to handle digest operations
+static int handle_digest_operation(cli_args_t* args) {
+    char* hash = NULL;
+    const char* input_name = args->input_file;
+    
+    // Check if input is stdin ("-")
+    if (strcmp(args->input_file, "-") == 0) {
+        // Read from stdin
+        size_t data_len;
+        unsigned char* data = read_file_from_stdin(&data_len);
+        if (!data) {
+            fprintf(stderr, "Error: Failed to read from stdin\n");
+            return 0;
+        }
+        
+        // Compute hash from data
+        if (args->hash_algorithm == HASH_SHA256) {
+            hash = sha256_hex(data, data_len);
+        } else if (args->hash_algorithm == HASH_SHA3_256) {
+            hash = sha3_256_hex(data, data_len);
+        } else {
+            fprintf(stderr, "Error: Unknown hash algorithm\n");
+            free(data);
+            return 0;
+        }
+        
+        free(data);
+        input_name = "-"; // Special name for stdin
+    } else {
+        // Read from file
+        hash = compute_hash(args->hash_algorithm, args->input_file);
+    }
+    
+    if (!hash) {
+        fprintf(stderr, "Error: Failed to compute hash\n");
+        return 0;
+    }
+    
+    // Output result in format "HASH_VALUE  INPUT_FILE_PATH"
+    if (args->output_file) {
+        FILE* out = fopen(args->output_file, "w");
+        if (!out) {
+            fprintf(stderr, "Error: Cannot open output file '%s'\n", args->output_file);
+            free(hash);
+            return 0;
+        }
+        fprintf(out, "%s  %s\n", hash, input_name);
+        fclose(out);
+        printf("Hash written to: %s\n", args->output_file);
+    } else {
+        printf("%s  %s\n", hash, input_name);
+    }
+    
+    free(hash);
+    return 1;
+}
+
+// Function to handle HMAC operations
+static int handle_hmac_operation(cli_args_t* args) {
+    char* hmac_result = NULL;
+    const char* input_name = args->input_file;
+    
+    if (strcmp(args->input_file, "-") == 0) {
+        // Read from stdin
+        size_t data_len;
+        unsigned char* data = read_file_from_stdin(&data_len);
+        if (!data) {
+            fprintf(stderr, "Error: Failed to read from stdin\n");
+            return 0;
+        }
+        
+        hmac_result = hmac_compute_hex(args->key, args->key_len, 
+                                      data, data_len, 
+                                      args->hash_algorithm);
+        free(data);
+        input_name = "-";
+    } else {
+        // Read from file
+        hmac_result = hmac_compute_file_hex(args->key, args->key_len,
+                                           args->input_file, args->hash_algorithm);
+    }
+    
+    if (!hmac_result) {
+        fprintf(stderr, "Error: Failed to compute HMAC\n");
+        return 0;
+    }
+    
+    // Verification or output
+    if (args->verify_mode && args->verify_file) {
+        // Read expected HMAC from file
+        size_t verify_size;
+        unsigned char* verify_data = read_file(args->verify_file, &verify_size);
+        if (!verify_data) {
+            fprintf(stderr, "Error: Cannot read verify file '%s'\n", args->verify_file);
+            free(hmac_result);
+            return 0;
+        }
+        
+        // Parse expected HMAC (format: HMAC_VALUE FILENAME)
+        char expected_hex[65] = {0};
+        sscanf((char*)verify_data, "%64s", expected_hex);
+        free(verify_data);
+        
+        if (strcmp(hmac_result, expected_hex) == 0) {
+            printf("[OK] HMAC verification successful\n");
+            free(hmac_result);
+            return 1;
+        } else {
+            fprintf(stderr, "[ERROR] HMAC verification failed\n");
+            free(hmac_result);
+            return 0;
+        }
+    } else {
+        // Output HMAC
+        if (args->output_file) {
+            FILE* out = fopen(args->output_file, "w");
+            if (!out) {
+                fprintf(stderr, "Error: Cannot open output file '%s'\n", args->output_file);
+                free(hmac_result);
+                return 0;
+            }
+            fprintf(out, "%s  %s\n", hmac_result, input_name);
+            fclose(out);
+            printf("HMAC written to: %s\n", args->output_file);
+        } else {
+            printf("%s  %s\n", hmac_result, input_name);
+        }
+        free(hmac_result);
+        return 1;
+    }
+}
+
 int main(int argc, char* argv[]) {
     cli_args_t args;
     
@@ -164,65 +416,40 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    // Обработка режима хеширования
-    if (args.operation_mode == MODE_DIGEST) {
-        char* hash = NULL;
-        const char* input_name = args.input_file;
-        
-        // Проверяем, является ли ввод stdin ("-")
-        if (strcmp(args.input_file, "-") == 0) {
-            hash = compute_hash_from_stdin(args.hash_algorithm);
-            input_name = "-"; // Специальное имя для stdin
-        } else {
-            hash = compute_hash(args.hash_algorithm, args.input_file);
-        }
-        
-        if (!hash) {
-            fprintf(stderr, "Error: Failed to compute hash\n");
-            free_cli_args(&args);
-            return 1;
-        }
-        
-        // Вывод результата в формате "HASH_VALUE  INPUT_FILE_PATH"
-        if (args.output_file) {
-            FILE* out = fopen(args.output_file, "w");
-            if (!out) {
-                fprintf(stderr, "Error: Cannot open output file '%s'\n", args.output_file);
-                free(hash);
-                free_cli_args(&args);
-                return 1;
+    // Handle different operations
+    int result = 0;
+    
+    switch(args.operation) {
+        case OPERATION_DIGEST:
+            result = handle_digest_operation(&args);
+            break;
+            
+        case OPERATION_HMAC:
+            result = handle_hmac_operation(&args);
+            break;
+            
+        case OPERATION_ENCRYPT:
+            if (args.gcm_mode) {
+                result = handle_gcm_operation(&args, 1);
+            } else {
+                result = handle_crypto_operation(&args, 1);
             }
-            fprintf(out, "%s  %s\n", hash, input_name);
-            fclose(out);
-            printf("Hash written to: %s\n", args.output_file);
-        } else {
-            printf("%s  %s\n", hash, input_name);
-        }
-        
-        free(hash);
-        free_cli_args(&args);
-        return 0;
-    }
-    
-    // Обработка режима шифрования/дешифрования
-    // Определяем, это шифрование или дешифрование
-    // Проверяем аргументы командной строки
-    int is_encrypt = 0;
-    for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "-encrypt") == 0) {
-            is_encrypt = 1;
             break;
-        } else if (strcmp(argv[i], "-decrypt") == 0) {
-            is_encrypt = 0;
+            
+        case OPERATION_DECRYPT:
+            if (args.gcm_mode) {
+                result = handle_gcm_operation(&args, 0);
+            } else {
+                result = handle_crypto_operation(&args, 0);
+            }
             break;
-        }
-    }
-    
-    if (!handle_crypto_operation(&args, is_encrypt)) {
-        free_cli_args(&args);
-        return 1;
+            
+        default:
+            fprintf(stderr, "Error: Unknown operation\n");
+            result = 0;
+            break;
     }
     
     free_cli_args(&args);
-    return 0;
+    return result ? 0 : 1;
 }

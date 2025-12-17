@@ -4,28 +4,36 @@
 #include <stdlib.h>
 #include "types.h"
 #include "hash.h"
-
-typedef enum {
-    MODE_ENCRYPT_DECRYPT,
-    MODE_DIGEST,
-    MODE_UNKNOWN
-} operation_mode_t;
+#include "mac/hmac.h"
 
 typedef struct {
-    operation_mode_t operation_mode;  // Основной режим: шифрование или хеширование
-    cipher_mode_t cipher_mode;        // Режим шифрования (только для MODE_ENCRYPT_DECRYPT)
-    hash_algorithm_t hash_algorithm;  // Алгоритм хеширования (только для MODE_DIGEST)
-    char* algorithm;                  // Строковый алгоритм
+    operation_t operation;           // Основная операция
+    cipher_mode_t cipher_mode;       // Режим шифрования
+    hash_algorithm_t hash_algorithm; // Алгоритм хеширования
+    
+    char* algorithm;                 // Строковый алгоритм
     unsigned char* key;
     size_t key_len;
     char* input_file;
     char* output_file;
-    unsigned char* iv;
+    
+    unsigned char* iv;               // Для шифрования
     size_t iv_len;
     int iv_provided;
+    
+    unsigned char* aad;              // Для GCM
+    size_t aad_len;
+    
     char* generated_key_hex;
-    int verify_mode;                  // Для будущей HMAC-верификации
-    char* verify_file;                // Файл для верификации
+    
+    // Для HMAC
+    int hmac_mode;
+    char* verify_file;
+    int verify_mode;
+    
+    // Для GCM
+    int gcm_mode;
+    
 } cli_args_t;
 
 int parse_arguments(int argc, char* argv[], cli_args_t* args);

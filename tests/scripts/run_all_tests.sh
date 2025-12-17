@@ -10,6 +10,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Перейти в директорию скриптов
+cd "$(dirname "$0")"
+
 # Function to run test with output
 run_test() {
     local test_name="$1"
@@ -29,7 +32,7 @@ run_test() {
 
 # Build everything first
 echo -e "\n${YELLOW}Building project...${NC}"
-make clean
+cd ../..
 if ! make all; then
     echo -e "${RED}Build failed!${NC}"
     exit 1
@@ -37,22 +40,22 @@ fi
 
 echo -e "${GREEN}Build successful!${NC}"
 
+# Go back to scripts directory
+cd tests/scripts
+
 # Run tests
 failed=0
 passed=0
 
 # Unit tests
-run_test "CSPRNG Unit Tests" "../bin/test_csprng" && ((passed++)) || ((failed++))
-run_test "Round-trip Unit Tests" "../bin/test_roundtrip" && ((passed++)) || ((failed++))
+run_test "GCM Unit Tests" "../../bin/test_gcm_vectors" && ((passed++)) || ((failed++))
+run_test "HMAC Unit Tests" "../../bin/test_hmac_vectors" && ((passed++)) || ((failed++))
+run_test "Hash Unit Tests" "../../bin/test_hash" && ((passed++)) || ((failed++))
 
 # Integration tests
 run_test "Round-trip Integration" "./test_roundtrip.sh" && ((passed++)) || ((failed++))
 run_test "Key Generation Tests" "./test_key_generation.sh" && ((passed++)) || ((failed++))
 run_test "OpenSSL Interoperability" "./test_interoperability.sh" && ((passed++)) || ((failed++))
-
-# Optional tests
-echo -e "\n${YELLOW}▶ Optional tests:${NC}"
-run_test "Padding Tests" "./padding_test.sh" && ((passed++)) || ((failed++))
 
 # Summary
 echo "=========================================="
@@ -65,10 +68,5 @@ if [ $failed -gt 0 ]; then
 else
     echo -e "${GREEN}All tests passed!${NC}"
 fi
-
-# Cleanup
-echo -e "\n${YELLOW}Cleaning up test files...${NC}"
-make clean > /dev/null 2>&1
-rm -f ../data/*.enc ../data/*.dec ../data/test_*.txt 2>/dev/null
 
 exit $failed

@@ -7,7 +7,17 @@ typedef enum {
     CIPHER_MODE_CFB,
     CIPHER_MODE_OFB,
     CIPHER_MODE_CTR,
+    CIPHER_MODE_GCM,
     CIPHER_MODE_UNKNOWN
 } cipher_mode_t;
+
+typedef enum {
+    OPERATION_NONE,
+    OPERATION_ENCRYPT,
+    OPERATION_DECRYPT,
+    OPERATION_DIGEST,
+    OPERATION_HMAC,
+    OPERATION_VERIFY
+} operation_t;
 
 #endif
