@@ -1,4 +1,0 @@
-=== CryptoCore Round-trip Tests ===
-
-[0;31mError: cryptocore binary not found at ../bin/cryptocore[0m
-Please build the project first using 'make'

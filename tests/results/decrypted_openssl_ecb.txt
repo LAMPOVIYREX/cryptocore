@@ -1,3 +1,0 @@
-This is a test file for CryptoCore and OpenSSL interoperability testing.
-Additional line with special characters: ~!@#$%^&*()_+{}|:"<>?[]\;',./
-End of test file.
