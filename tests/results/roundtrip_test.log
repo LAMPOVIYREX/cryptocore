@@ -1,0 +1,9 @@
+=== CryptoCore Round-trip Tests ===
+
+Testing ECB mode... ✓
+Testing CBC mode... ✓
+Testing CFB mode... ✓
+Testing OFB mode... ✓
+Testing CTR mode... ✓
+
+=== All round-trip tests passed! ===
