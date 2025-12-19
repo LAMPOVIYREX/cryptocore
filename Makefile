@@ -13,7 +13,7 @@ BIN_DIR = bin
 # Source files (explicitly list all source files)
 MAIN_SRCS = $(SRC_DIR)/aead.c $(SRC_DIR)/cli_parser.c $(SRC_DIR)/crypto.c \
             $(SRC_DIR)/csprng.c $(SRC_DIR)/file_io.c $(SRC_DIR)/hash.c \
-            $(SRC_DIR)/main.c $(SRC_DIR)/modes.c
+            $(SRC_DIR)/main.c $(SRC_DIR)/modes.c $(SRC_DIR)/kdf.c
 
 MODE_SRCS = $(wildcard $(SRC_DIR)/modes/*.c)
 HASH_SRCS = $(wildcard $(SRC_DIR)/hash/*.c)
@@ -227,4 +227,5 @@ clean_tests:
 	@echo "✓ Cleaned test binaries"
 
 clean_all: clean clean_tests
+
 	@echo "✓ Cleaned all build artifacts and tests"
