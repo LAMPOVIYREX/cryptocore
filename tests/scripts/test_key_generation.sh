@@ -2,19 +2,27 @@
 
 echo "=== Key Generation Integration Test ==="
 
-BIN="../bin/cryptocore"          
-TEST_FILE="../data/test_key_gen.txt"
+# Получаем абсолютный путь
+PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+BIN="$PROJECT_ROOT/bin/cryptocore"
+TEST_DIR="$PROJECT_ROOT/tests/data"
+TEST_FILE="$TEST_DIR/test_key_gen.txt"
+RESULTS_DIR="$PROJECT_ROOT/tests/results"
 
-# Create test file
+# Создаем директории
+mkdir -p "$TEST_DIR"
+mkdir -p "$RESULTS_DIR"
+
+# Создаем тестовый файл
 echo "Test data for key generation" > "$TEST_FILE"
-
+echo "Additional test line" >> "$TEST_FILE"
 
 echo "1. Testing encryption with auto-generated key..."
-output=$("$BIN" -algorithm aes -mode cbc -encrypt -input "$TEST_FILE" -output "../data/encrypted.bin" 2>&1)
+output=$("$BIN" -algorithm aes -mode cbc -encrypt -input "$TEST_FILE" -output "$RESULTS_DIR/encrypted.bin" 2>&1)
 
-# Extract key from output (новый формат без @)
+# Extract key from output
 if echo "$output" | grep -q "Generated random key: [0-9a-fA-F]\{32\}"; then
-    generated_key=$(echo "$output" | grep "Generated random key: " | cut -d' ' -f4)
+    generated_key=$(echo "$output" | grep "Generated random key: " | awk '{print $4}')
     echo "✓ Key generation successful: $generated_key"
     
     # Проверяем что ключ не содержит @
@@ -29,7 +37,8 @@ else
 fi
 
 echo "2. Testing decryption with generated key..."
-if "$BIN" -algorithm aes -mode cbc -decrypt -key "$generated_key" -input "../data/encrypted.bin" -output "../data/decrypted.txt"; then
+if "$BIN" -algorithm aes -mode cbc -decrypt -key "$generated_key" \
+    -input "$RESULTS_DIR/encrypted.bin" -output "$RESULTS_DIR/decrypted.txt" 2>&1 | grep -q "Success"; then
     echo "✓ Decryption with generated key successful"
 else
     echo "✗ Decryption with generated key failed"
@@ -37,7 +46,7 @@ else
 fi
 
 echo "3. Verifying file integrity..."
-if diff "$TEST_FILE" "../data/decrypted.txt" > /dev/null; then
+if diff "$TEST_FILE" "$RESULTS_DIR/decrypted.txt" > /dev/null; then
     echo "✓ File integrity verified"
 else
     echo "✗ File integrity check failed"
@@ -45,24 +54,26 @@ else
 fi
 
 echo "4. Testing that decryption requires key..."
-if "$BIN" -algorithm aes -mode cbc -decrypt -input "../data/encrypted.bin" -output "../data/should_fail.txt" 2>/dev/null; then
+if "$BIN" -algorithm aes -mode cbc -decrypt \
+    -input "$RESULTS_DIR/encrypted.bin" -output "$RESULTS_DIR/should_fail.txt" 2>&1 | grep -q "Error"; then
+    echo "✓ Decryption correctly requires key"
+else
     echo "✗ Decryption without key should have failed"
     exit 1
-else
-    echo "✓ Decryption correctly requires key"
 fi
 
 # Test with new key format (без @)
-echo "5. Testing encryption with explicit key (new format)..."
-if "$BIN" -algorithm aes -mode ecb -encrypt -key "$generated_key" -input "$TEST_FILE" -output "../data/explicit_encrypted.bin"; then
-    echo "✓ Encryption with explicit key (new format) successful"
+echo "5. Testing encryption with explicit key..."
+if "$BIN" -algorithm aes -mode ecb -encrypt -key "$generated_key" \
+    -input "$TEST_FILE" -output "$RESULTS_DIR/explicit_encrypted.bin" 2>&1 | grep -q "Success"; then
+    echo "✓ Encryption with explicit key successful"
 else
     echo "✗ Encryption with explicit key failed"
     exit 1
 fi
 
-# Cleanup
-rm -f "$TEST_FILE" "../data/encrypted.bin" "../data/decrypted.txt" "../data/should_fail.txt" "../data/explicit_encrypted.bin"
-
 echo ""
 echo "=== All Key Generation Tests Passed! ==="
+
+# Cleanup optional
+# rm -rf "$RESULTS_DIR"

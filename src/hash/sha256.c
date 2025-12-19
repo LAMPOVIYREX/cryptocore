@@ -31,7 +31,7 @@ static const uint32_t K[64] = {
 #define SIG1(x) (ROTRIGHT(x, 17) ^ ROTRIGHT(x, 19) ^ ((x) >> 10))
 
 // Инициализация контекста SHA-256
-void sha256_init(SHA256_CTX *ctx) {
+void sha256_init(CRYPTOCORE_SHA256_CTX *ctx) {
     ctx->state[0] = 0x6a09e667;
     ctx->state[1] = 0xbb67ae85;
     ctx->state[2] = 0x3c6ef372;
@@ -45,10 +45,8 @@ void sha256_init(SHA256_CTX *ctx) {
     memset(ctx->buffer, 0, SHA256_BUF_SIZE);
 }
 
-
-
 // Обработка одного блока (512 бит = 64 байта)
-static void sha256_transform(SHA256_CTX *ctx, const unsigned char data[SHA256_BUF_SIZE]) {
+static void sha256_transform(CRYPTOCORE_SHA256_CTX *ctx, const unsigned char data[SHA256_BUF_SIZE]) {
     uint32_t a, b, c, d, e, f, g, h, i, j;
     uint32_t w[64];
     uint32_t temp1, temp2;
@@ -98,7 +96,7 @@ static void sha256_transform(SHA256_CTX *ctx, const unsigned char data[SHA256_BU
 }
 
 // Добавление данных в хеш
-void sha256_update(SHA256_CTX *ctx, const unsigned char *data, size_t len) {
+void sha256_update(CRYPTOCORE_SHA256_CTX *ctx, const unsigned char *data, size_t len) {
     uint32_t i;
     
     for (i = 0; i < len; ++i) {
@@ -114,7 +112,7 @@ void sha256_update(SHA256_CTX *ctx, const unsigned char *data, size_t len) {
 }
 
 // Завершение хеширования
-void sha256_final(SHA256_CTX *ctx, unsigned char hash[SHA256_BLOCK_SIZE]) {
+void sha256_final(CRYPTOCORE_SHA256_CTX *ctx, unsigned char hash[SHA256_BLOCK_SIZE]) {
     uint32_t i;
     unsigned char bit_count_bits[8];
     
@@ -148,7 +146,7 @@ void sha256_final(SHA256_CTX *ctx, unsigned char hash[SHA256_BLOCK_SIZE]) {
 
 // Удобная функция для хеширования данных
 void sha256(const unsigned char *data, size_t len, unsigned char hash[SHA256_BLOCK_SIZE]) {
-    SHA256_CTX ctx;
+    CRYPTOCORE_SHA256_CTX ctx;
     sha256_init(&ctx);
     sha256_update(&ctx, data, len);
     sha256_final(&ctx, hash);
@@ -176,7 +174,7 @@ char* sha256_file(const char *filename) {
     FILE *file = fopen(filename, "rb");
     if (!file) return NULL;
     
-    SHA256_CTX ctx;
+    CRYPTOCORE_SHA256_CTX ctx;
     sha256_init(&ctx);
     
     unsigned char buffer[4096];

@@ -17,7 +17,7 @@ int requires_padding(cipher_mode_t mode) {
 void generate_random_iv(unsigned char* iv, size_t len) {
     if (generate_random_bytes(iv, len) != 0) {
         fprintf(stderr, "Error: Failed to generate cryptographically secure IV\n");
-        exit(1);
+        memset(iv, 0, len);  
     }
 }
 

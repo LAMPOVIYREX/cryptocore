@@ -17,7 +17,8 @@ typedef enum {
     OPERATION_DECRYPT,
     OPERATION_DIGEST,
     OPERATION_HMAC,
-    OPERATION_VERIFY
+    OPERATION_VERIFY,
+    OPERATION_DERIVE
 } operation_t;
 
 #endif

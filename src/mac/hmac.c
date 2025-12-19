@@ -26,15 +26,13 @@ static size_t get_hash_output_size(hash_algorithm_t algo) {
     }
 }
 
-static void compute_hash_internal(hash_algorithm_t algo, 
-                                 const unsigned char* data, size_t len,
-                                 unsigned char* output) {
+// Helper function to compute hash directly
+static void compute_hash_direct(hash_algorithm_t algo, 
+                               const unsigned char* data, size_t len,
+                               unsigned char* output) {
     switch(algo) {
         case HASH_SHA256: {
-            SHA256_CTX ctx;
-            sha256_init(&ctx);
-            sha256_update(&ctx, data, len);
-            sha256_final(&ctx, output);
+            sha256(data, len, output);
             break;
         }
         case HASH_SHA3_256: {
@@ -73,7 +71,12 @@ CRYPTOCORE_HMAC_CTX* hmac_init(const unsigned char* key, size_t key_len, hash_al
     if (key_len > ctx->block_size) {
         // Hash key if it's longer than block size
         ctx->key_len = get_hash_output_size(hash_algo);
-        compute_hash_internal(hash_algo, key, key_len, processed_key);
+        unsigned char hashed_key[ctx->key_len];
+        compute_hash_direct(hash_algo, key, key_len, hashed_key);
+        // Копируем весь хеш в processed_key
+        memcpy(processed_key, hashed_key, ctx->key_len);
+        // Очищаем временный буфер
+        memset(hashed_key, 0, ctx->key_len);
     } else {
         // Copy key as-is if shorter or equal to block size
         ctx->key_len = key_len;
@@ -112,15 +115,15 @@ CRYPTOCORE_HMAC_CTX* hmac_init(const unsigned char* key, size_t key_len, hash_al
     
     // Initialize hash contexts for streaming
     if (hash_algo == HASH_SHA256) {
-        ctx->sha256_inner_ctx = malloc(sizeof(SHA256_CTX));
+        ctx->sha256_inner_ctx = malloc(sizeof(CRYPTOCORE_SHA256_CTX));
         if (ctx->sha256_inner_ctx) {
-            sha256_init((SHA256_CTX*)ctx->sha256_inner_ctx);
-            sha256_update((SHA256_CTX*)ctx->sha256_inner_ctx, ctx->ipad, ctx->block_size);
+            sha256_init((CRYPTOCORE_SHA256_CTX*)ctx->sha256_inner_ctx);
+            sha256_update((CRYPTOCORE_SHA256_CTX*)ctx->sha256_inner_ctx, ctx->ipad, ctx->block_size);
         }
         
-        ctx->sha256_outer_ctx = malloc(sizeof(SHA256_CTX));
+        ctx->sha256_outer_ctx = malloc(sizeof(CRYPTOCORE_SHA256_CTX));
         if (ctx->sha256_outer_ctx) {
-            sha256_init((SHA256_CTX*)ctx->sha256_outer_ctx);
+            sha256_init((CRYPTOCORE_SHA256_CTX*)ctx->sha256_outer_ctx);
             // opad will be added in hmac_final
         }
     } else if (hash_algo == HASH_SHA3_256) {
@@ -144,7 +147,7 @@ void hmac_update(CRYPTOCORE_HMAC_CTX* ctx, const unsigned char* data, size_t dat
     if (!ctx || !data || data_len == 0) return;
     
     if (ctx->hash_algo == HASH_SHA256 && ctx->sha256_inner_ctx) {
-        sha256_update((SHA256_CTX*)ctx->sha256_inner_ctx, data, data_len);
+        sha256_update((CRYPTOCORE_SHA256_CTX*)ctx->sha256_inner_ctx, data, data_len);
     } else if (ctx->hash_algo == HASH_SHA3_256 && ctx->sha3_inner_ctx) {
         EVP_DigestUpdate(ctx->sha3_inner_ctx, data, data_len);
     }
@@ -158,21 +161,24 @@ void hmac_final(CRYPTOCORE_HMAC_CTX* ctx, unsigned char* output) {
     
     // Complete inner hash
     if (ctx->hash_algo == HASH_SHA256 && ctx->sha256_inner_ctx) {
-        sha256_final((SHA256_CTX*)ctx->sha256_inner_ctx, inner_hash);
+        sha256_final((CRYPTOCORE_SHA256_CTX*)ctx->sha256_inner_ctx, inner_hash);
         
         // Start outer hash with opad
-        sha256_update((SHA256_CTX*)ctx->sha256_outer_ctx, ctx->opad, ctx->block_size);
-        sha256_update((SHA256_CTX*)ctx->sha256_outer_ctx, inner_hash, hash_size);
-        sha256_final((SHA256_CTX*)ctx->sha256_outer_ctx, output);
+        sha256_update((CRYPTOCORE_SHA256_CTX*)ctx->sha256_outer_ctx, ctx->opad, ctx->block_size);
+        sha256_update((CRYPTOCORE_SHA256_CTX*)ctx->sha256_outer_ctx, inner_hash, hash_size);
+        sha256_final((CRYPTOCORE_SHA256_CTX*)ctx->sha256_outer_ctx, output);
     } else if (ctx->hash_algo == HASH_SHA3_256 && ctx->sha3_inner_ctx) {
         unsigned int hash_len;
         EVP_DigestFinal_ex(ctx->sha3_inner_ctx, inner_hash, &hash_len);
         
         // Start outer hash with opad
         EVP_DigestUpdate(ctx->sha3_outer_ctx, ctx->opad, ctx->block_size);
-        EVP_DigestUpdate(ctx->sha3_outer_ctx, inner_hash, hash_size);
+        EVP_DigestUpdate(ctx->sha3_outer_ctx, inner_hash, hash_len);
         EVP_DigestFinal_ex(ctx->sha3_outer_ctx, output, &hash_len);
     }
+    
+    // Clean inner hash from memory
+    memset(inner_hash, 0, hash_size);
 }
 
 void hmac_cleanup(CRYPTOCORE_HMAC_CTX* ctx) {
@@ -205,6 +211,7 @@ void hmac_cleanup(CRYPTOCORE_HMAC_CTX* ctx) {
     }
 }
 
+// Simplified HMAC computation
 char* hmac_compute_hex(const unsigned char* key, size_t key_len, 
                       const unsigned char* data, size_t data_len, 
                       hash_algorithm_t hash_algo) {

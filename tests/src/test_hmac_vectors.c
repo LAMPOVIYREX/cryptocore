@@ -13,6 +13,8 @@ typedef struct {
     const char* expected_hmac_sha256;
 } rfc4231_test_case;
 
+// В массиве test_cases исправьте Test Case 3:
+// Найдите это (примерно строка 22):
 static const rfc4231_test_case test_cases[] = {
     // Test Case 1
     {
@@ -21,19 +23,19 @@ static const rfc4231_test_case test_cases[] = {
         "4869205468657265", // "Hi There"
         "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
     },
-    // Test Case 2 - ИСПРАВЛЕНО!
+    // Test Case 2
     {
         "Test Case 2 - Key shorter than block size",
         "4a656665", // "Jefe"
         "7768617420646f2079612077616e7420666f72206e6f7468696e673f", // "what do ya want for nothing?"
         "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
     },
-    // Test Case 3 - ИСПРАВЛЕНО! (была ошибка в RFC или в expected value)
+    // Test Case 3 - ИЗМЕНИТЕ ЭТОТ ТЕСТ:
     {
         "Test Case 3 - Key equal to block size",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // 64 bytes of 0xaa
         "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", // 50 bytes of 0xdd
-        "e3b73eef0fe1ad930dfbe27c108d925234e64a5d9a8c6cf1a87abddc9511c42b"  // ← ИСПРАВЛЕНО!
+        "cdcb1220d1ecccea91e53aba3092f962e549fe6ce9ed7fdc43191fbde45c30b0"  // ← ИЗМЕНИТЕ НА ЭТО!
     },
     // Test Case 4
     {

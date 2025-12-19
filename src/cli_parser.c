@@ -107,7 +107,7 @@ static int parse_crypto_arguments(int argc, char* argv[], cli_args_t* args) {
         return 0;
     }
     
-    // KEY VALIDATION - UPDATED FOR MILESTONE 3
+    // KEY VALIDATION
     if (encrypt_flag && args->key == NULL) {
         // Generate random key
         char* generated_key_hex = generate_random_key_hex(16);
@@ -331,6 +331,72 @@ static int parse_hmac_arguments(int argc, char* argv[], cli_args_t* args) {
     return 1;
 }
 
+// Function to parse KDF arguments (Sprint 7)
+static int parse_kdf_arguments(int argc, char* argv[], cli_args_t* args) {
+    int i = 2; // Skip "cryptocore" and "derive"
+    args->operation = OPERATION_DERIVE;
+    args->kdf_mode = 1;
+    
+    // Default values
+    args->iterations = 100000;
+    args->key_length = 32; // 256 bits
+    
+    for (; i < argc; i++) {
+        if (strcmp(argv[i], "--password") == 0 && i + 1 < argc) {
+            args->password = malloc(strlen(argv[i + 1]) + 1);
+            if (args->password) strcpy(args->password, argv[i + 1]);
+            i++;
+        }
+        else if (strcmp(argv[i], "--salt") == 0 && i + 1 < argc) {
+            args->salt = malloc(strlen(argv[i + 1]) + 1);
+            if (args->salt) strcpy(args->salt, argv[i + 1]);
+            i++;
+        }
+        else if (strcmp(argv[i], "--iterations") == 0 && i + 1 < argc) {
+            args->iterations = atoi(argv[i + 1]);
+            if (args->iterations < 1000) {
+                fprintf(stderr, "Warning: Iteration count is very low (%u)\n", args->iterations);
+            }
+            if (args->iterations > 10000000) {
+                fprintf(stderr, "Warning: Iteration count is very high (%u), may be slow\n", args->iterations);
+            }
+            i++;
+        }
+        else if (strcmp(argv[i], "--length") == 0 && i + 1 < argc) {
+            args->key_length = atoi(argv[i + 1]);
+            if (args->key_length < 16 || args->key_length > 64) {
+                fprintf(stderr, "Error: Key length must be between 16 and 64 bytes\n");
+                return 0;
+            }
+            i++;
+        }
+        else if (strcmp(argv[i], "--algorithm") == 0 && i + 1 < argc) {
+            if (strcmp(argv[i + 1], "pbkdf2") != 0) {
+                fprintf(stderr, "Error: Only pbkdf2 algorithm is supported\n");
+                return 0;
+            }
+            i++;
+        }
+        else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
+            args->output_file = malloc(strlen(argv[i + 1]) + 1);
+            if (args->output_file) strcpy(args->output_file, argv[i + 1]);
+            i++;
+        }
+        else {
+            fprintf(stderr, "Error: Unknown argument '%s' for derive command\n", argv[i]);
+            return 0;
+        }
+    }
+    
+    // Validation
+    if (args->password == NULL) {
+        fprintf(stderr, "Error: Password is required (--password PASSWORD)\n");
+        return 0;
+    }
+    
+    return 1;
+}
+
 void print_usage(const char* program_name) {
     fprintf(stderr, "CryptoCore - A Minimalist Cryptographic Provider\n");
     fprintf(stderr, "================================================\n\n");
@@ -347,11 +413,16 @@ void print_usage(const char* program_name) {
     fprintf(stderr, "    %s dgst --algorithm [sha256|sha3-256] --hmac --key HEX_KEY \\\n", program_name);
     fprintf(stderr, "        --input INPUT_FILE [--output OUTPUT_FILE] [--verify VERIFY_FILE]\n");
     fprintf(stderr, "\n");
+    fprintf(stderr, "  Key Derivation (PBKDF2):\n");
+    fprintf(stderr, "    %s derive --password PASSWORD [--salt HEX_SALT] [--iterations N] [--length L] [--output FILE]\n", program_name);
+    fprintf(stderr, "\n");
     fprintf(stderr, "Examples:\n");
     fprintf(stderr, "  Encryption with generated key: %s -algorithm aes -mode cbc -encrypt -input plain.txt -output cipher.bin\n", program_name);
     fprintf(stderr, "  GCM encryption with AAD: %s -algorithm aes -mode gcm -encrypt -key KEY -input plain.txt -output cipher.bin -aad AAD_HEX\n", program_name);
     fprintf(stderr, "  HMAC generation: %s dgst --algorithm sha256 --hmac --key KEY --input file.txt --output hmac.txt\n", program_name);
     fprintf(stderr, "  HMAC verification: %s dgst --algorithm sha256 --hmac --key KEY --input file.txt --verify expected_hmac.txt\n", program_name);
+    fprintf(stderr, "  PBKDF2 with generated salt: %s derive --password \"my secret\" --iterations 100000\n", program_name);
+    fprintf(stderr, "  PBKDF2 with specific salt: %s derive --password \"pass\" --salt a1b2c3d4 --length 32\n", program_name);
 }
 
 cipher_mode_t parse_cipher_mode(const char* mode_str) {
@@ -421,6 +492,8 @@ int parse_arguments(int argc, char* argv[], cli_args_t* args) {
             args->operation = OPERATION_DIGEST;
             return parse_digest_arguments(argc, argv, args);
         }
+    } else if (strcmp(argv[1], "derive") == 0) {
+        return parse_kdf_arguments(argc, argv, args);
     } else {
         // Encryption/decryption mode
         return parse_crypto_arguments(argc, argv, args);
@@ -445,4 +518,14 @@ void free_cli_args(cli_args_t* args) {
     }
     if (args->generated_key_hex) free(args->generated_key_hex);
     if (args->verify_file) free(args->verify_file);
+    
+    // KDF fields (Sprint 7)
+    if (args->password) {
+        memset(args->password, 0, strlen(args->password));
+        free(args->password);
+    }
+    if (args->salt) {
+        memset(args->salt, 0, strlen(args->salt));
+        free(args->salt);
+    }
 }

@@ -28,7 +28,7 @@ char* compute_hash(hash_algorithm_t algorithm, const char *filename) {
 // Новая функция для вычисления хеша из stdin
 char* compute_hash_from_stdin(hash_algorithm_t algorithm) {
     if (algorithm == HASH_SHA256) {
-        SHA256_CTX ctx;
+        CRYPTOCORE_SHA256_CTX ctx;
         sha256_init(&ctx);
         
         unsigned char buffer[4096];

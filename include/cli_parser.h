@@ -34,6 +34,13 @@ typedef struct {
     // Для GCM
     int gcm_mode;
     
+    // Для KDF (Sprint 7)
+    int kdf_mode;
+    char* password;
+    char* salt;
+    unsigned int iterations;
+    size_t key_length;
+    
 } cli_args_t;
 
 int parse_arguments(int argc, char* argv[], cli_args_t* args);
