@@ -59,7 +59,7 @@ TEST_GCM_OBJ = $(TEST_GCM_SRC:tests/src/%.c=$(OBJ_DIR)/tests/%.o)
 TEST_KDF_OBJ = $(TEST_KDF_SRC:tests/src/%.c=$(OBJ_DIR)/tests/%.o)
 
 # Phony targets
-.PHONY: all clean install-dependencies test test_hmac test_hash test_roundtrip test_csprng test_hash_req test_gcm test_kdf test_all help test_hmac_build test_hash_build test_roundtrip_build test_csprng_build test_hash_req_build test_gcm_build test_kdf_build
+.PHONY: all clean install-dependencies test test_hmac test_hash test_roundtrip test_csprng test_hash_req test_gcm test_kdf test_all help test_hmac_build test_hash_build test_roundtrip_build test_csprng_build test_hash_req_build test_gcm_build test_kdf_build test-data clean-test-data
 
 # Default target
 all: $(TARGET)
@@ -87,6 +87,8 @@ help:
 	@echo "  test_gcm_build          - Build GCM test binary"
 	@echo "  test_kdf_build          - Build KDF test binary"
 	@echo "  test_all                - Run all tests (unit + integration)"
+	@echo "  test-data               - Generate test data files"
+	@echo "  clean-test-data         - Clean test data files"
 	@echo "  help                    - Show this help message"
 
 # Main binary
@@ -143,6 +145,34 @@ clean:
 	@echo "=== Cleaning Build Artifacts ==="
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 	@echo "✓ Cleaned all build artifacts"
+
+# Clean test files
+clean_tests:
+	@echo "=== Cleaning Test Binaries ==="
+	rm -f $(TEST_HMAC_BIN) $(TEST_HASH_BIN) $(TEST_ROUNDTRIP_BIN) $(TEST_CSPRNG_BIN) $(TEST_HASH_REQ_BIN) $(TEST_GCM_BIN) $(TEST_KDF_BIN)
+	rm -rf $(OBJ_DIR)/tests
+	@echo "✓ Cleaned test binaries"
+
+clean_all: clean clean_tests clean-test-data
+	@echo "✓ Cleaned all build artifacts and tests"
+
+# Test data management
+test-data:
+	@echo "=== Generating Test Data ==="
+	@if [ -f "generate_test_files.sh" ]; then \
+		chmod +x generate_test_files.sh; \
+		./generate_test_files.sh; \
+	else \
+		echo "Error: generate_test_files.sh not found in current directory"; \
+		echo "Please create generate_test_files.sh script first"; \
+		exit 1; \
+	fi
+
+clean-test-data:
+	@echo "=== Cleaning Test Data ==="
+	rm -rf test_data
+	rm -f encrypted.bin decrypted.txt *.hmac key.txt *.enc *.dec test_*.txt test_*.bin
+	@echo "✓ Test data cleaned"
 
 # Test targets
 test_hmac_build: $(TEST_HMAC_BIN)
@@ -230,20 +260,13 @@ test: test_hash test_hash_req test_roundtrip test_csprng test_hmac test_gcm test
 	@echo ""
 	@echo "=== All Unit Tests Passed! ==="
 
-test_all: test
+test_all: test test-data
 	@echo ""
-	@echo "=== Running Simplified Integration Tests ==="
-	@echo "Running KDF integration test only..."
-	@cd tests/scripts && ./test_kdf_integration.sh
+	@echo "=== Running Integration Tests ==="
+	@if [ -f "tests/scripts/test_kdf_integration.sh" ]; then \
+		cd tests/scripts && ./test_kdf_integration.sh; \
+	else \
+		echo "Note: Integration tests not found, running unit tests only"; \
+	fi
 	@echo ""
 	@echo "=== Integration test completed ==="
-
-# Clean test files
-clean_tests:
-	@echo "=== Cleaning Test Binaries ==="
-	rm -f $(TEST_HMAC_BIN) $(TEST_HASH_BIN) $(TEST_ROUNDTRIP_BIN) $(TEST_CSPRNG_BIN) $(TEST_HASH_REQ_BIN) $(TEST_GCM_BIN) $(TEST_KDF_BIN)
-	rm -rf $(OBJ_DIR)/tests
-	@echo "✓ Cleaned test binaries"
-
-clean_all: clean clean_tests
-	@echo "✓ Cleaned all build artifacts and tests"

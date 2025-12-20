@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/evp.h>
+#include <openssl/err.h>
 #include <time.h>
 
 #include "../include/cli_parser.h"
@@ -13,6 +14,11 @@
 #include "../include/mac/hmac.h"
 #include "../include/modes/gcm.h"
 #include "../include/kdf.h"
+
+// Инициализация OpenSSL
+static void init_openssl() {
+    OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CRYPTO_STRINGS | OPENSSL_INIT_ADD_ALL_CIPHERS, NULL);
+}
 
 // Forward declarations
 static int handle_gcm_operation(cli_args_t* args, int is_encrypt);
@@ -155,11 +161,7 @@ static int handle_crypto_operation(cli_args_t* args, int is_encrypt) {
     if (is_encrypt) {
         // Generate random IV for modes that need it
         if (args->cipher_mode != CIPHER_MODE_ECB && args->cipher_mode != CIPHER_MODE_GCM) {
-            if (generate_random_bytes(iv, 16) == 0) {
-                fprintf(stderr, "Error: Failed to generate IV\n");
-                free(input_data);
-                return 0;
-            }
+            generate_random_iv(iv, 16);
             iv_ptr = iv;
         }
     } else { // DECRYPT
@@ -512,6 +514,9 @@ static int handle_kdf_operation(cli_args_t* args) {
 }
 
 int main(int argc, char* argv[]) {
+    // Инициализируем OpenSSL
+    init_openssl();
+    
     cli_args_t args;
     
     if (!parse_arguments(argc, argv, &args)) {

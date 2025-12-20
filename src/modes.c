@@ -16,8 +16,9 @@ int requires_padding(cipher_mode_t mode) {
 
 void generate_random_iv(unsigned char* iv, size_t len) {
     if (generate_random_bytes(iv, len) != 0) {
-        fprintf(stderr, "Error: Failed to generate cryptographically secure IV\n");
-        memset(iv, 0, len);  
+        fprintf(stderr, "Error: Failed to generate IV\n");
+        // Вместо обнуления, просто оставляем сообщение об ошибке
+        // Пользовательская функция должна обработать эту ошибку
     }
 }
 
@@ -148,6 +149,7 @@ unsigned char* aes_cbc_decrypt(const unsigned char* input, size_t input_len,
     
     // Remove padding
     if (!pkcs7_unpad(&output, &input_len)) {
+        fprintf(stderr, "Error: PKCS#7 unpadding failed in CBC mode\n");
         free(output);
         return NULL;
     }

@@ -1,364 +1,716 @@
 # CryptoCore
 
-A comprehensive command-line cryptographic toolkit supporting encryption, hashing, and message authentication. Built as part of a cryptography course with implementations from scratch where specified.
+**CryptoCore** — это комплексная криптографическая библиотека с командным интерфейсом, реализующая современные криптографические алгоритмы **с нуля** в рамках образовательного курса по криптографии.
 
-## Features
+## 📋 Содержание
+- [Особенности](#-особенности)
+- [Требования](#-требования)
+- [Установка](#️-установка)
+- [Быстрый старт](#-быстрый-старт)
+- [Использование](#-использование)
+- [Тестирование](#-тестирование)
+- [Структура проекта](#-структура-проекта)
+- [Соответствие спринтам](#-соответствие-спринтам)
+- [Безопасность](#-безопасность)
+- [Лицензия](#-лицензия)
 
-### Encryption/Decryption
-- **Algorithms**: AES-128
-- **Modes**: ECB, CBC, CFB, OFB, CTR, GCM (AEAD)
-- **Padding**: PKCS#7 (for ECB and CBC modes)
-- **Key Management**: Automatic secure key generation or hexadecimal input
-- **IV Handling**: Automatic generation for encryption, file-based or argument for decryption
-- **Security**: Cryptographically secure random number generation using OpenSSL RAND_bytes
+## ✨ Особенности
 
-### Hashing (Sprint 4)
-- **SHA-256**: Implemented from scratch following NIST FIPS 180-4
-- **SHA3-256**: Using OpenSSL's implementation
-- **File Support**: Handles files of any size with streaming processing
-- **Output Format**: Standard hash format compatible with system tools
+### 🛡️ Шифрование/Дешифрование (Sprint 1-2, 6)
+- **Алгоритм**: AES-128
+- **Режимы**: ECB, CBC, CFB, OFB, CTR, GCM (AEAD)
+- **Паддинг**: PKCS#7 (для ECB и CBC режимов)
+- **Генерация ключей**: Автоматическая безопасная генерация через CSPRNG
+- **Обработка IV**: Автоматическая генерация для шифрования
 
-### HMAC (Sprint 5)
-- **RFC 2104 Compliant**: HMAC implementation from scratch
-- **SHA-256 Based**: Uses the SHA-256 implementation from Sprint 4
-- **Variable Key Sizes**: Supports keys of any length
-- **Streaming Processing**: Handles large files efficiently
-- **Verification Mode**: Can verify existing HMAC values
-- **Tamper Detection**: Detects file modifications and incorrect keys
+### 🔍 Хеширование (Sprint 4)
+- **SHA-256**: Полная реализация с нуля по FIPS 180-4
+- **SHA3-256**: Использует OpenSSL
+- **Формат вывода**: Полная совместимость с `sha256sum`, `sha3sum`
 
-### GCM Authenticated Encryption (Sprint 6)
-- **NIST SP 800-38D Compliant**: GCM implementation from scratch
-- **Authenticated Encryption with Associated Data (AEAD)**: Supports AAD
-- **Constant-time Tag Verification**: Prevents timing attacks
-- **Secure Nonce Generation**: 12-byte random nonce for each encryption
-- **Authentication Failure Protection**: No output file created on failure
+### 🏷️ HMAC (Sprint 5)
+- **RFC 2104 compliant**: Реализация HMAC-SHA256 с нуля
+- **Проверка целостности**: Обнаружение подмены данных
+- **Постоянное время**: Защита от timing attacks
+- **Ключи любой длины**: Корректная обработка граничных случаев
 
-## Build Instructions
+### 🔒 GCM Аутентифицированное Шифрование (Sprint 6)
+- **NIST SP 800-38D compliant**: Реализация GCM с нуля
+- **AAD поддержка**: Дополнительные аутентифицированные данные
+- **Nonce 12 байт**: Рекомендованный размер для безопасности
+- **Безопасность**: Проверка тегов с постоянным временем
 
-### Prerequisites
+### 🗝️ Функции Получения Ключей (Sprint 7)
+- **PBKDF2-HMAC-SHA256**: Реализация по RFC 2898/RFC 6070
+- **Безопасная генерация соли**: Автоматическая при необходимости
+- **Настраиваемые параметры**: Итерации, длина ключа, соль
 
-- GCC compiler
-- OpenSSL development libraries
+### 🎲 CSPRNG (Sprint 3)
+- **Криптографически стойкий ГСЧ**: Использование OpenSSL RAND_bytes()
+- **Генерация ключей**: Автоматическая при шифровании
+- **Предупреждения**: Проверка слабых ключей
 
-### On Ubuntu/Debian:
+## 📦 Требования
+
+### Обязательные
+- GCC компилятор (≥ 7.0)
+- OpenSSL библиотеки (≥ 1.1.1)
+
+### На Ubuntu/Debian:
 ```bash
 sudo apt-get update
 sudo apt-get install build-essential libssl-dev openssl xxd
+```
 
-Build:
-bash
-make
-Or install dependencies and build:
+### На macOS:
+```bash
+brew install openssl
+```
 
-bash
+### На Windows (MinGW/WSL):
+```bash
+# Используйте WSL или MinGW с OpenSSL
+```
+
+## 🛠️ Установка
+
+### Клонирование и сборка
+```bash
+# 1. Клонируйте репозиторий
+git clone https://github.com/LAMPOVIYREX/cryptocore
+cd cryptocore
+
+# 2. Установите зависимости
 make install-dependencies
-make
-Usage
-Encryption/Decryption
-Encryption with auto-generated key:
 
-bash
-./bin/cryptocore -algorithm aes -mode cbc -encrypt -input plain.txt -output cipher.bin
-The tool will generate a secure random key and display it:
+# 3. Соберите проект
+make all
 
-text
-Generated random key: 1a2b3c4d5e6f7890fedcba9876543210
-Success: plain.txt -> cipher.bin
-Generated IV: aabbccddeeff00112233445566778899
-Encryption with specific key:
+# 4. Создайте тестовые данные
+make test-data
+```
 
-bash
-./bin/cryptocore -algorithm aes -mode cbc -encrypt -key 00112233445566778899aabbccddeeff -input plain.txt -output cipher.bin
-Decryption:
+### Проверка сборки
+```bash
+# Проверьте что бинарник создан
+./bin/cryptocore --help
+```
 
-bash
-./bin/cryptocore -algorithm aes -mode cbc -decrypt -key 00112233445566778899aabbccddeeff -input cipher.bin -output decrypted.txt
-GCM Mode (Authenticated Encryption)
-Encryption with Additional Authenticated Data (AAD):
-bash
-./bin/cryptocore -algorithm aes -mode gcm -encrypt \
+## 🚀 Быстрый старт
+
+### 1. Подготовка тестовых данных
+```bash
+# Создайте тестовые файлы в cryptocore/test_data/
+make test-data
+
+# Проверьте созданные файлы
+ls -la test_data/
+```
+
+### 2. Базовые операции
+```bash
+# Перейдите в директорию с тестовыми данными
+cd test_data
+
+# 1. Шифрование файла (CBC режим)
+../bin/cryptocore -algorithm aes -mode cbc -encrypt \
+    -input secret.txt \
+    -output secret.enc
+
+# 2. Вычисление хеша (SHA-256)
+../bin/cryptocore dgst --algorithm sha256 \
+    --input document.pdf.txt
+
+# 3. Генерация HMAC для проверки целостности
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 00112233445566778899aabbccddeeff \
+    --input hmac_test.txt \
+    --output hmac_test.hmac
+
+# 4. Генерация ключа из пароля (PBKDF2)
+../bin/cryptocore derive \
+    --password "$(cat user_password.txt)" \
+    --iterations 100000 \
+    --length 32 \
+    --output derived_key.txt
+```
+
+### 3. Очистка после тестирования
+```bash
+# Вернитесь в корневую директорию
+cd ..
+
+# Очистите тестовые файлы
+make clean-test-data
+```
+
+## 💻 Использование
+
+Все примеры предполагают, что вы находитесь в директории `cryptocore/test_data/`.
+
+### 📊 Поддерживаемые операции
+
+| Операция | Команда | Описание | Спринт |
+|----------|---------|----------|--------|
+| **Шифрование** | `-encrypt` | Шифрование файла | 1-2 |
+| **Дешифрование** | `-decrypt` | Дешифрование файла | 1-2 |
+| **Хеширование** | `dgst` | Вычисление хеша | 4 |
+| **HMAC** | `dgst --hmac` | Вычисление HMAC | 5 |
+| **PBKDF2** | `derive` | Генерация ключа | 7 |
+
+### 1. Шифрование/Дешифрование (Sprint 1-2)
+
+#### 🔐 Шифрование с автоматической генерацией ключа
+```bash
+../bin/cryptocore -algorithm aes -mode cbc -encrypt \
+    -input secret.txt \
+    -output secret.enc
+```
+**Вывод**: 
+```
+Generated random key: f80e434292fb315988b53a441d730e35
+Success: secret.txt -> secret.enc
+Generated IV: a1b2c3d4e5f678901234567890abcdef
+```
+
+#### 🔑 Шифрование с указанным ключом
+```bash
+../bin/cryptocore -algorithm aes -mode ctr -encrypt \
     -key 00112233445566778899aabbccddeeff \
     -input secret.txt \
-    -output secret.enc \
-    -aad feedfacedeadbeeffeedfacedeadbeefabaddad2
-Decryption with AAD verification:
-bash
-./bin/cryptocore -algorithm aes -mode gcm -decrypt \
+    -output secret.enc
+```
+
+#### 🔓 Дешифрование
+```bash
+../bin/cryptocore -algorithm aes -mode cbc -decrypt \
     -key 00112233445566778899aabbccddeeff \
     -input secret.enc \
-    -output secret_decrypted.txt \
-    -aad feedfacedeadbeeffeedfacedeadbeefabaddad2
-Error Cases:
-Wrong AAD during decryption → authentication failure, no output file created
+    -output secret_decrypted.txt
+```
 
-Tampered ciphertext → authentication failure, no output file created
+#### 🎯 Все режимы шифрования
+```bash
+# ECB (без IV, только для тестирования)
+../bin/cryptocore -algorithm aes -mode ecb -encrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input secret.txt \
+    -output secret_ecb.enc
 
-Wrong tag → authentication failure, no output file created
+# CBC (с padding, рекомендуется)
+../bin/cryptocore -algorithm aes -mode cbc -encrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input secret.txt \
+    -output secret_cbc.enc
 
-Security Notes:
-Nonce (12 bytes) is randomly generated for each encryption
+# CFB (без padding, потоковый режим)
+../bin/cryptocore -algorithm aes -mode cfb -encrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input secret.txt \
+    -output secret_cfb.enc
 
-Tag (16 bytes) provides 128-bit authentication
+# OFB (без padding, потоковый режим)
+../bin/cryptocore -algorithm aes -mode ofb -encrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input secret.txt \
+    -output secret_ofb.enc
 
-AAD is authenticated but not encrypted
+# CTR (без padding, потоковый режим)
+../bin/cryptocore -algorithm aes -mode ctr -encrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input secret.txt \
+    -output secret_ctr.enc
+```
 
-Constant-time tag comparison prevents timing attacks
+### 2. Хеширование (Sprint 4)
 
-Hashing
-Basic hash computation:
+#### 🔍 SHA-256 (реализация с нуля)
+```bash
+../bin/cryptocore dgst --algorithm sha256 \
+    --input document.pdf.txt
+```
+**Вывод**: `1238b9eef1f582cee5abe5d1b467996d79401e1f174d98b517f20df433728ff2  document.pdf.txt`
 
-bash
-./bin/cryptocore dgst --algorithm sha256 --input document.pdf
-Hash with output to file:
+#### 🌟 SHA3-256
+```bash
+../bin/cryptocore dgst --algorithm sha3-256 \
+    --input document.pdf.txt \
+    --output document.sha3
+```
 
-bash
-./bin/cryptocore dgst --algorithm sha3-256 --input backup.tar --output backup.sha3
-Verify against system tools:
+#### ✅ Проверка совместимости с системными утилитами
+```bash
+# CryptoCore
+../bin/cryptocore dgst --algorithm sha256 --input secret.txt > crypto_hash.txt
 
-bash
-./bin/cryptocore dgst --algorithm sha256 --input test.txt > my_hash.txt
-sha256sum test.txt > system_hash.txt
-diff my_hash.txt system_hash.txt
-HMAC (Message Authentication)
-Generate HMAC:
+# Системная утилита (должна совпадать)
+sha256sum secret.txt > system_hash.txt
 
-bash
-./bin/cryptocore dgst --algorithm sha256 --hmac --key KEY_HEX --input file.txt
-Generate HMAC and save to file:
+# Сравнение
+diff crypto_hash.txt system_hash.txt && echo "✅ Hashes match!"
+```
 
-bash
-./bin/cryptocore dgst --algorithm sha256 --hmac --key KEY_HEX --input secret.txt --output secret.hmac
-Verify HMAC:
+### 3. HMAC (Sprint 5)
 
-bash
-./bin/cryptocore dgst --algorithm sha256 --hmac --key KEY_HEX --input secret.txt --verify expected.hmac
-Supported Modes
-Encryption Modes:
-ecb - Electronic Codebook (no IV)
+#### 🛡️ Генерация HMAC для проверки целостности
+```bash
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 4a6566654a6566654a6566654a656665 \
+    --input hmac_test.txt \
+    --output hmac_test.hmac
+```
+**Вывод**: `HMAC written to: hmac_test.hmac`
 
-cbc - Cipher Block Chaining
+#### ✅ Проверка HMAC
+```bash
+# Успешная проверка
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 4a6566654a6566654a6566654a656665 \
+    --input hmac_test.txt \
+    --verify hmac_test.hmac
+# Вывод: [OK] HMAC verification successful
 
-cfb - Cipher Feedback
+# Неудачная проверка (измените файл)
+echo "tampered" >> hmac_test.txt
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 4a6566654a6566654a6566654a656665 \
+    --input hmac_test.txt \
+    --verify hmac_test.hmac
+# Вывод: [ERROR] HMAC verification failed
+```
 
-ofb - Output Feedback
+#### 🔐 Ключи разной длины
+```bash
+# Короткий ключ (4 байта = "Jefe")
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 4a656665 \
+    --input secret.txt
 
-ctr - Counter
+# Длинный ключ (32 байта)
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff \
+    --input secret.txt
+```
 
-gcm - Galois/Counter Mode (Authenticated Encryption)
+### 4. GCM Аутентифицированное Шифрование (Sprint 6)
 
-Hash Algorithms:
-sha256 - SHA-256 (implemented from scratch)
+#### 🔒 Шифрование с Additional Authenticated Data (AAD)
+```bash
+# Преобразуем метаданные в hex
+AAD_HEX=$(cat aad_metadata.txt | xxd -p | tr -d '\n')
 
-sha3-256 - SHA3-256 (using OpenSSL)
+../bin/cryptocore -algorithm aes -mode gcm -encrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input gcm_metadata.txt \
+    -output gcm_metadata.enc \
+    -aad "$AAD_HEX"
+```
+**Вывод**:
+```
+Success: gcm_metadata.txt -> gcm_metadata.enc
+Generated nonce: bc59eabb29c430c48c65c6b8
+AAD used: 757365723d746573747c726f6c653d61646d696e7c6465706172746d656e743d73656375726974797c6c6576656c3d636f6e666964656e7469616c7c74696d657374616d703d313736363235353833390a
+```
 
-HMAC Algorithms:
-sha256 - HMAC-SHA256 (implemented from scratch)
+#### 🔓 Дешифрование с проверкой AAD
+```bash
+../bin/cryptocore -algorithm aes -mode gcm -decrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input gcm_metadata.enc \
+    -output gcm_metadata_decrypted.txt \
+    -aad "$AAD_HEX"
+```
 
-sha3-256 - HMAC-SHA3-256 (using OpenSSL)
+#### ⚠️ Безопасная обработка ошибок
+```bash
+# Неверный AAD
+WRONG_AAD="00000000000000000000000000000000"
 
-Key and IV Format
-Keys: Hexadecimal strings (16 bytes = 32 hex characters for AES-128)
+../bin/cryptocore -algorithm aes -mode gcm -decrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input gcm_metadata.enc \
+    -output should_not_exist.txt \
+    -aad "$WRONG_AAD"
+# Вывод: [ERROR] Authentication failed: AAD mismatch or ciphertext tampered
+# Файл should_not_exist.txt НЕ создается!
+```
 
-IVs: Hexadecimal strings (16 bytes = 32 hex characters)
+### 5. PBKDF2 (Sprint 7)
 
-No @ prefix required - use plain hex strings
+#### 🗝️ Генерация ключа с автоматической солью
+```bash
+../bin/cryptocore derive \
+    --password "$(cat user_password.txt)" \
+    --iterations 100000 \
+    --length 32
+```
+**Вывод**:
+```
+=== PBKDF2 Key Derivation ===
 
-HMAC Keys: Any length hexadecimal strings
+Generated random salt: 3a1975e12eeb9e6cdb4811bc51e84be5
+Password length: 23 characters
+Salt (hex): 3a1975e12eeb9e6cdb4811bc51e84be5
+Iterations: 100000
+Derived key length: 32 bytes (256 bits)
+Derivation time: 0.093 seconds
 
-Examples:
+=== Derived Key ===
+Key (hex): 86e79e3acd1e9404046f064765120924c45d86e6f0fff01d9097efd348f2d588
+First 8 bytes: 86e79e3acd1e9404...
+Last 8 bytes: ...9097efd348f2d588
+```
 
-Valid key: 00112233445566778899aabbccddeeff
+#### 🧂 Генерация с указанной солью
+```bash
+../bin/cryptocore derive \
+    --password "my secret password" \
+    --salt a1b2c3d4e5f67890 \
+    --iterations 50000 \
+    --length 16
+```
 
-Valid IV: aabbccddeeff00112233445566778899
+#### 💾 Сохранение в файл
+```bash
+../bin/cryptocore derive \
+    --password "strong password with @#$% symbols" \
+    --iterations 310000 \
+    --length 24 \
+    --output derived_key.txt
+```
 
-Valid HMAC key (short): 4a656665 ("Jefe" in hex)
+## 🧪 Тестирование
 
-Valid HMAC key (long): 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-
-Testing
-Run all tests:
-bash
+### Полный тестовый прогон
+```bash
+# Из корневой директории cryptocore/
 make test_all
-Run specific test suites:
-bash
-# Unit tests
-make test
-make test_hmac
-make test_hash
-make test_roundtrip
-make test_csprng
-make test_gcm  # New GCM tests
+```
 
-# Integration tests
+### Модульные тесты по спринтам
+
+| Тест | Команда | Проверяемый спринт | Описание |
+|------|---------|-------------------|----------|
+| **Hash Tests** | `make test_hash` | Sprint 4 | SHA-256/SHA3-256 векторы NIST |
+| **HMAC Tests** | `make test_hmac` | Sprint 5 | RFC 4231 векторы, проверка целостности |
+| **GCM Tests** | `make test_gcm` | Sprint 6 | NIST SP 800-38D векторы, уникальность nonce |
+| **KDF Tests** | `make test_kdf` | Sprint 7 | RFC 6070 векторы, детерминизм |
+| **CSPRNG Tests** | `make test_csprng` | Sprint 3 | Уникальность ключей, статистические тесты |
+| **Round-trip Tests** | `make test_roundtrip` | Sprint 1-2 | Шифрование → дешифрование всех режимов |
+
+### Интеграционные тесты
+```bash
+# Из корневой директории
 cd tests/scripts
+
+# Все интеграционные тесты
 ./run_all_tests.sh
+
+# Совместимость с OpenSSL
+./test_interoperability.sh
+
+# Тесты HMAC
 ./test_hmac_integration.sh
-./test_gcm_unique_nonce.sh  # New GCM nonce test
-GCM-specific tests:
-bash
-# Build and run GCM unit tests
-make test_gcm_build
-./bin/test_gcm_vectors
 
-# Run GCM integration tests
-cd tests/scripts
+# Тесты PBKDF2
+./test_kdf_integration.sh
+
+# Тесты GCM
 ./test_gcm_unique_nonce.sh
-Examples
-File Encryption and Decryption:
-bash
-# Encrypt with random key
-./bin/cryptocore -algorithm aes -mode ctr -encrypt -input secret.txt -output secret.enc
+```
 
-# Decrypt with the generated key
-./bin/cryptocore -algorithm aes -mode ctr -decrypt -key <generated_key> -input secret.enc -output secret_decrypted.txt
-GCM Authenticated Encryption:
-bash
-# Encrypt with AAD
-./bin/cryptocore -algorithm aes -mode gcm -encrypt -key KEY -input data.txt -output data.enc -aad AAD_HEX
+### Практические тесты из test_data/
+```bash
+# Перейдите в директорию с тестами
+cd test_data
 
-# Decrypt and verify
-./bin/cryptocore -algorithm aes -mode gcm -decrypt -key KEY -input data.enc -output data_decrypted.txt -aad AAD_HEX
-Message Authentication with HMAC:
-bash
-# Generate HMAC for a file
-./bin/cryptocore dgst --algorithm sha256 --hmac --key mysecretkey --input data.bin > data.hmac
+# 1. Полный цикл шифрования-дешифрования
+echo "Важное сообщение" > test_message.txt
 
-# Verify HMAC later
-./bin/cryptocore dgst --algorithm sha256 --hmac --key mysecretkey --input data.bin --verify data.hmac
-Implementation Notes
-SHA-256:
-Implemented from scratch (no external dependencies)
+# Шифрование
+../bin/cryptocore -algorithm aes -mode cbc -encrypt \
+    -input test_message.txt -output test_encrypted.bin
 
-Passes all NIST test vectors
+# Дешифрование (используйте сгенерированный ключ)
+../bin/cryptocore -algorithm aes -mode cbc -decrypt \
+    -key <СКОПИРОВАННЫЙ_КЛЮЧ> \
+    -input test_encrypted.bin -output test_decrypted.txt
 
-Uses standard Merkle-Damgård construction
+# Проверка
+diff test_message.txt test_decrypted.txt && echo "✅ Round-trip successful!"
 
-HMAC:
-Implemented from scratch following RFC 2104
+# 2. Проверка целостности с HMAC
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 00112233445566778899aabbccddeeff \
+    --input secret.txt --output test.hmac
 
-Passes all RFC 4231 test vectors
+# Имитация подмены
+cp secret.txt secret_tampered.txt
+echo "изменено" >> secret_tampered.txt
 
-Correctly handles edge cases (empty files, various key sizes)
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 00112233445566778899aabbccddeeff \
+    --input secret_tampered.txt --verify test.hmac
+# Должен вывести ошибку
 
-Uses constant-time comparison for verification
+# 3. Тест GCM с разными AAD
+AAD1="feedfacedeadbeeffeedfacedeadbeefabaddad2"
+AAD2="0000000000000000000000000000000000000000"
+../bin/cryptocore -algorithm aes -mode gcm -encrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input gcm_metadata.txt -output test_gcm.enc \
+    -aad "$AAD1"
 
-GCM:
-Implemented from scratch following NIST SP 800-38D
+# Попытка дешифрования с неверным AAD
+../bin/cryptocore -algorithm aes -mode gcm -decrypt \
+    -key 00112233445566778899aabbccddeeff \
+    -input test_gcm.enc -output /dev/null \
+    -aad "$AAD2"
+# Должен вывести ошибку аутентификации
+```
 
-GF(2¹²⁸) multiplication with polynomial x¹²⁸ + x⁷ + x² + x + 1
+## 🏗️ Структура проекта
 
-12-byte nonce (recommended size)
-
-16-byte authentication tag
-
-Constant-time tag verification
-
-Encryption Modes:
-ECB and CBC use PKCS#7 padding
-
-CFB, OFB, CTR are stream ciphers (no padding)
-
-GCM provides authenticated encryption
-
-All modes are interoperable with OpenSSL
-
-Security Notes
-Generated keys are displayed only once - save them securely
-
-The tool warns about potentially weak user-provided keys
-
-IVs are automatically generated using CSPRNG for encryption
-
-For decryption, IVs can be read from file or provided via command line
-
-HMAC keys should be kept secret and have sufficient entropy
-
-GCM provides both confidentiality and authentication
-
-Critical: On GCM authentication failure, no output file is created
-
-All hash/MAC functions process files in chunks to handle large files efficiently
-
-Project Structure
-text
+```
 cryptocore/
-├── bin/                    # Compiled binaries
-├── include/               # Header files
-│   ├── hash/             # Hash function headers
-│   │   ├── sha256.h
-│   │   └── sha3_256.h
-│   ├── mac/              # MAC headers
-│   │   └── hmac.h
-│   ├── modes/            # Encryption mode headers
-│   │   └── gcm.h
-│   ├── aead.h
-│   ├── cli_parser.h
-│   ├── common.h
-│   ├── crypto.h
-│   ├── csprng.h
-│   ├── file_io.h
-│   ├── hash.h
-│   └── types.h
-├── src/                  # Source code
-│   ├── hash/             # Hash implementations
-│   │   ├── sha256.c
-│   │   └── sha3_256.c
-│   ├── mac/              # MAC implementations
-│   │   └── hmac.c
-│   ├── modes/            # Encryption mode implementations
-│   │   └── gcm.c
-│   ├── aead.c
-│   ├── cli_parser.c
-│   ├── crypto.c
-│   ├── csprng.c
-│   ├── file_io.c
-│   ├── hash.c
-│   ├── main.c
-│   └── modes.c
-├── tests/                # Test files
-│   ├── bin/              # Test binaries
-│   ├── data/             # Test data
-│   ├── results/          # Test results
-│   ├── scripts/          # Test scripts
-│   │   ├── debug_test.sh
-│   │   ├── fixed_interop_test.sh
-│   │   ├── openssl_safe_test.sh
-│   │   ├── padding_test.sh
-│   │   ├── run_all_tests.sh
-│   │   ├── run_nist_tests.sh
-│   │   ├── run_tests.sh
-│   │   ├── safe_test.sh
-│   │   ├── test_hmac_integration.sh
-│   │   ├── test_interoperability.sh
-│   │   ├── test_key_generation.sh
-│   │   ├── test_roundtrip.sh
-│   │   ├── test_gcm_unique_nonce.sh     # New GCM test
-│   │   └── test_gcm_interop.sh          # New GCM interoperability test
-│   └── src/              # Test source code
-│       ├── test_csprng.c
-│       ├── test_hash.c
-│       ├── test_hash_requirements.c
-│       ├── test_hmac_vectors.c
-│       ├── test_roundtrip.c
-│       └── test_gcm_vectors.c           # New GCM vector tests
-├── Makefile              # Build system
-└── README.md             # This file
-License
-This project is for educational purposes as part of a cryptography course.
+├── bin/                    # Скомпилированные бинарники
+│   ├── cryptocore         # Основная программа
+│   ├── test_hash          # Тесты хеширования (Sprint 4)
+│   ├── test_hmac_vectors  # Тесты HMAC (Sprint 5)
+│   ├── test_gcm_vectors   # Тесты GCM (Sprint 6)
+│   ├── test_kdf_vectors   # Тесты KDF (Sprint 7)
+│   ├── test_csprng        # Тесты CSPRNG (Sprint 3)
+│   └── test_roundtrip     # Round-trip тесты (Sprint 1-2)
+├── include/               # Заголовочные файлы
+│   ├── hash/             # Хеш-функции (Sprint 4)
+│   ├── mac/              # MAC функции (Sprint 5)
+│   ├── modes/            # Режимы шифрования
+│   ├── aead.h            # AEAD интерфейс (Sprint 6)
+│   ├── cli_parser.h      # Парсер командной строки
+│   ├── common.h          # Общие утилиты
+│   ├── crypto.h          # Основные криптооперации (Sprint 1-2)
+│   ├── csprng.h          # CSPRNG (Sprint 3)
+│   ├── file_io.h         # Ввод/вывод файлов
+│   ├── hash.h            # Интерфейс хеш-функций (Sprint 4)
+│   ├── kdf.h             # KDF функции (Sprint 7)
+│   └── types.h           # Общие типы данных
+├── src/                  # Исходный код
+│   ├── hash/             # Реализации хеш-функций (Sprint 4)
+│   │   ├── sha256.c      # SHA-256 (полная реализация)
+│   │   └── sha3_256.c    # SHA3-256 обёртка
+│   ├── mac/              # MAC реализации (Sprint 5)
+│   │   └── hmac.c        # HMAC (полная реализация)
+│   ├── modes/            # Режимы шифрования
+│   │   └── gcm.c         # GCM (полная реализация, Sprint 6)
+│   ├── aead.c            # AEAD реализация (Sprint 6)
+│   ├── cli_parser.c      # Парсер CLI
+│   ├── crypto.c          # Базовые криптооперации (Sprint 1-2)
+│   ├── csprng.c          # CSPRNG реализация (Sprint 3)
+│   ├── file_io.c         # Файловый ввод/вывод
+│   ├── hash.c            # Интерфейс хешей (Sprint 4)
+│   ├── kdf.c             # KDF реализации (Sprint 7)
+│   ├── main.c            # Главная программа
+│   └── modes.c           # Реализации режимов (Sprint 2)
+├── test_data/            # ТЕСТОВЫЕ ДАННЫЕ (создается make test-data)
+│   ├── secret.txt        # Простой текст для шифрования
+│   ├── document.pdf.txt  # "PDF" документ для хеширования
+│   ├── hmac_test.txt     # Файл для тестирования HMAC
+│   ├── gcm_metadata.txt  # Файл с метаданными для GCM
+│   ├── aad_metadata.txt  # Метаданные для AAD
+│   ├── user_password.txt # Пароль для PBKDF2
+│   ├── random.bin        # Бинарный файл 10KB
+│   └── report.txt        # Текстовый отчет
+├── tests/                # Тесты (Sprint 8)
+│   ├── data/             # Тестовые данные
+│   ├── results/          # Результаты тестов
+│   ├── scripts/          # Скрипты тестирования
+│   └── src/              # Исходники тестов
+├── Makefile              # Система сборки
+├── README.md             # Этот файл
+└── generate_test_files.sh # Генератор тестовых данных
+```
 
-Acknowledgments
-NIST for cryptographic standards (FIPS 180-4, FIPS 202, SP 800-38D, RFC 2104)
+## 📊 Соответствие спринтам
 
-OpenSSL project for cryptographic libraries
+### ✅ SPRINT 1 – Foundation & ECB Mode
+- [x] Структура проекта и Makefile
+- [x] CLI парсер с валидацией
+- [x] AES-128 ECB с PKCS#7 padding
+- [x] Работа с файлами в `test_data/`
+- [x] Round-trip тестирование
 
-Course instructors for guidance and requirements
+### ✅ SPRINT 2 – CBC, CFB, OFB, CTR
+- [x] Реализация всех режимов шифрования
+- [x] Автоматическая генерация IV через CSPRNG
+- [x] PKCS#7 padding для ECB/CBC
+- [x] Интероперабельность с OpenSSL
+- [x] Тестирование из `test_data/`
 
-RFC authors for clear specifications
+### ✅ SPRINT 3 – CSPRNG
+- [x] Модуль CSPRNG с `generate_random_bytes()`
+- [x] Автоматическая генерация ключей при шифровании
+- [x] Предупреждения о слабых ключах
+- [x] Тестирование уникальности 1000 ключей
 
-Sprint Completion Status
-✅ Sprint 1: Core ECB mode implementation
-✅ Sprint 2: Confidential modes (CBC, CFB, OFB, CTR)
-✅ Sprint 3: CSPRNG and key generation
-✅ Sprint 4: Hash functions (SHA-256, SHA3-256)
-✅ Sprint 5: HMAC for data authenticity and integrity
-✅ Sprint 6: GCM authenticated encryption with associated data
+### ✅ SPRINT 4 – Хеширование
+- [x] SHA-256 реализация с нуля по FIPS 180-4
+- [x] Команда `dgst` с форматом `sha256sum`
+- [x] Поддержка файлов из `test_data/`
+- [x] Тесты: NIST векторы, пустые файлы, лавинный эффект
+- [x] Совместимость с `sha256sum`/`sha3sum`
+
+### ✅ SPRINT 5 – HMAC
+- [x] HMAC-SHA256 реализация с нуля по RFC 2104
+- [x] Поддержка ключей любой длины
+- [x] Проверка HMAC `--verify`
+- [x] Тесты из `test_data/`
+- [x] Обнаружение подмены данных
+- [x] Постоянное время сравнения
+
+### ✅ SPRINT 6 – GCM AEAD
+- [x] GCM реализация с нуля по NIST SP 800-38D
+- [x] Поддержка Additional Authenticated Data (AAD)
+- [x] Nonce 12 байт (рекомендованный размер)
+- [x] Безопасная обработка ошибок (файл не создается при неудаче)
+- [x] Тестирование с файлами из `test_data/`
+
+### ✅ SPRINT 7 – KDF
+- [x] PBKDF2-HMAC-SHA256 реализация по RFC 2898
+- [x] Команда `derive` с параметрами
+- [x] Автоматическая генерация соли
+- [x] Тестирование с паролями из `test_data/`
+- [x] Предупреждения о безопасности
+
+### ✅ SPRINT 8 – Финальная полировка
+- [x] Комплексное тестирование (unit + integration)
+- [x] Known-answer тесты (NIST, RFC векторы)
+- [x] Интероперабельность с OpenSSL
+- [x] Негативные тесты (ошибки ввода, аутентификация)
+- [x] Безопасность памяти (очистка ключей)
+- [x] Полная документация
+- [x] Security checklist
+- [x] Автоматизация тестов (`run_all_tests.sh`)
+
+## 🔒 Безопасность
+
+### ⚠️ Важное предупреждение
+
+**ВНИМАНИЕ**: Этот проект создан **ИСКЛЮЧИТЕЛЬНО ДЛЯ ОБРАЗОВАТЕЛЬНЫХ ЦЕЛЕЙ**.
+
+### Что реализовано с нуля:
+1. **SHA-256** - полная реализация по FIPS 180-4
+2. **HMAC-SHA256** - реализация по RFC 2104
+3. **GCM** - реализация по NIST SP 800-38D
+4. **PBKDF2-HMAC-SHA256** - реализация по RFC 2898
+5. **Режимы AES** (CBC, CFB, OFB, CTR) - реализованы поверх AES блока
+
+### Меры безопасности в коде:
+- ✅ **Постоянное время сравнения** для HMAC и GCM тегов
+- ✅ **Очистка памяти** с ключами перед освобождением
+- ✅ **Валидация всех входных данных**
+- ✅ **Безопасная генерация** ключей, IV, nonce, salt через CSPRNG
+- ✅ **Защита от ошибок** - GCM не создает файл при неудачной аутентификации
+- ✅ **Инициализация OpenSSL** в начале программы
+
+### Рекомендации для production:
+- ✅ Используйте GCM для аутентифицированного шифрования
+- ✅ Генерируйте уникальные nonce для каждого GCM шифрования
+- ✅ Используйте HMAC для проверки целостности важных файлов
+- ✅ Для PBKDF2 используйте ≥ 100,000 итераций
+- ❌ Не используйте ECB в production среде
+- ❌ Не переиспользуйте ключи и IV/nonce
+
+### Security Checklist (Sprint 8):
+- ✅ Ключи не логируются (только hex представление при генерации)
+- ✅ CSPRNG используется всегда для криптографических операций
+- ✅ Память с ключами очищается (memset перед free)
+- ✅ Аутентификация ДО расшифровки (GCM проверяет тег перед дешифрованием)
+- ✅ Все входные данные валидируются (размеры, форматы, границы)
+- ✅ Ошибки не раскрывают секреты (общие сообщения об ошибках)
+
+## 📄 Лицензия
+
+© 2024 CryptoCore Educational Project
+
+Этот проект создан **исключительно для образовательных целей** в рамках курса по криптографии. Весь исходный код открыт для изучения, анализа и использования в образовательных целях.
+
+**ВАЖНОЕ ПРЕДУПРЕЖДЕНИЕ О БЕЗОПАСНОСТИ**:
+- Эта реализация предназначена **ТОЛЬКО** для образовательных целей
+- **НЕ используйте** этот код для защиты реальных данных в production среде
+- Для защиты реальных данных используйте проверенные криптографические библиотеки:
+  - OpenSSL (C/C++)
+  - libsodium (современная криптография)
+  - Bouncy Castle (Java)
+  - cryptography (Python)
+
+Авторы не несут ответственности за любой ущерб, вызванный использованием этого кода в production среде.
+
+## 🙏 Благодарности
+
+### Образовательные ресурсы
+- **Преподавателям курса** по криптографии за требования и руководство
+- **Учебным материалам** по реализации криптографических алгоритмов
+
+### Стандарты и спецификации
+- **NIST (National Institute of Standards and Technology)** за:
+  - FIPS 180-4 (SHA-256)
+  - FIPS 197 (AES)
+  - SP 800-38D (GCM)
+- **IETF (Internet Engineering Task Force)** за:
+  - RFC 2104 (HMAC)
+  - RFC 2898 (PBKDF2)
+  - RFC 6070 (PBKDF2 test vectors)
+  - RFC 4231 (HMAC test vectors)
+
+### Открытое программное обеспечение
+- **OpenSSL Project** за криптографические библиотеки
+- **GCC** за компилятор и инструменты разработки
+- **Git** за систему контроля версий
+
+---
+
+## 🎯 Пример полного рабочего процесса
+
+```bash
+# 1. Подготовка
+cd cryptocore
+make all
+make test-data
+cd test_data
+
+# 2. Шифрование важного документа с GCM
+AAD_HEX=$(cat aad_metadata.txt | xxd -p | tr -d '\n')
+../bin/cryptocore -algorithm aes -mode gcm -encrypt \
+    -input gcm_metadata.txt \
+    -output confidential.enc \
+    -aad "$AAD_HEX"
+
+# 3. Создание HMAC для проверки целостности
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 00112233445566778899aabbccddeeff \
+    --input document.pdf.txt \
+    --output document.hmac
+
+# 4. Генерация ключа из пароля для архивации
+../bin/cryptocore derive \
+    --password "$(cat user_password.txt)" \
+    --iterations 310000 \
+    --length 32 \
+    --output archive_key.txt
+
+# 5. Проверка целостности перед использованием
+../bin/cryptocore dgst --algorithm sha256 --hmac \
+    --key 00112233445566778899aabbccddeeff \
+    --input document.pdf.txt \
+    --verify document.hmac && echo "✅ File integrity verified"
+
+# 6. Очистка
+cd ..
+make clean-test-data
+```
+
+**CryptoCore** представляет собой завершённый образовательный проект, демонстрирующий полный цикл реализации современных криптографических алгоритмов — от базовых примитивов до сложных протоколов с аутентификацией. Все операции тестируются с файлами из директории `test_data/`.
+
+Проект соответствует **всем обязательным требованиям** 8 спринтов и готов к демонстрации и использованию в образовательных целях.
+
+**Happy learning and secure coding!** 🔐🎓
