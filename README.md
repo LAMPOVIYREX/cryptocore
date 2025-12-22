@@ -77,7 +77,7 @@ brew install openssl
 ### Клонирование и сборка
 ```bash
 # 1. Клонируйте репозиторий
-git clone https://github.com/LAMPOVIYREX/cryptocore
+git clone --depth 1 https://github.com/LAMPOVIYREX/cryptocore.git
 cd cryptocore
 
 # 2. Установите зависимости
@@ -85,6 +85,8 @@ make install-dependencies
 
 # 3. Соберите проект
 make all
+
+chmod +x tests/scripts/*.sh
 
 # 4. Создайте тестовые данные
 make test-data
