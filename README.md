@@ -62,16 +62,6 @@ sudo apt-get update
 sudo apt-get install build-essential libssl-dev openssl xxd
 ```
 
-### На macOS:
-```bash
-brew install openssl
-```
-
-### На Windows (MinGW/WSL):
-```bash
-# Используйте WSL или MinGW с OpenSSL
-```
-
 ## 🛠️ Установка
 
 ### Клонирование и сборка
@@ -240,7 +230,7 @@ Generated IV: a1b2c3d4e5f678901234567890abcdef
     --output document.sha3
 ```
 
-#### ✅ Проверка совместимости с системными утилитами
+#### Проверка совместимости с системными утилитами
 ```bash
 # CryptoCore
 ../bin/cryptocore dgst --algorithm sha256 --input secret.txt > crypto_hash.txt
@@ -249,7 +239,7 @@ Generated IV: a1b2c3d4e5f678901234567890abcdef
 sha256sum secret.txt > system_hash.txt
 
 # Сравнение
-diff crypto_hash.txt system_hash.txt && echo "✅ Hashes match!"
+diff crypto_hash.txt system_hash.txt && echo "Hashes match!"
 ```
 
 ### 3. HMAC (Sprint 5)
@@ -263,7 +253,7 @@ diff crypto_hash.txt system_hash.txt && echo "✅ Hashes match!"
 ```
 **Вывод**: `HMAC written to: hmac_test.hmac`
 
-#### ✅ Проверка HMAC
+#### Проверка HMAC
 ```bash
 # Успешная проверка
 ../bin/cryptocore dgst --algorithm sha256 --hmac \
@@ -439,7 +429,7 @@ echo "Важное сообщение" > test_message.txt
     -input test_encrypted.bin -output test_decrypted.txt
 
 # Проверка
-diff test_message.txt test_decrypted.txt && echo "✅ Round-trip successful!"
+diff test_message.txt test_decrypted.txt && echo "Round-trip successful!"
 
 # 2. Проверка целостности с HMAC
 ../bin/cryptocore dgst --algorithm sha256 --hmac \
@@ -704,14 +694,14 @@ AAD_HEX=$(cat aad_metadata.txt | xxd -p | tr -d '\n')
 ../bin/cryptocore dgst --algorithm sha256 --hmac \
     --key 00112233445566778899aabbccddeeff \
     --input document.pdf.txt \
-    --verify document.hmac && echo "✅ File integrity verified"
+    --verify document.hmac && echo "File integrity verified"
 
 # 6. Очистка
 cd ..
 make clean-test-data
 ```
 
-**CryptoCore** представляет собой завершённый образовательный проект, демонстрирующий полный цикл реализации современных криптографических алгоритмов — от базовых примитивов до сложных протоколов с аутентификацией. Все операции тестируются с файлами из директории `test_data/`.
+**CryptoCore** представляет собой завершённый образовательный проект, демонстрирующий полный цикл реализации современных криптографических алгоритмов — от базовых примитивов до сложных протоколов с аутентификацией. Все операции тестируются с файлами из директории `test_data/`, созданными автоматически.
 
 Проект соответствует **всем обязательным требованиям** 8 спринтов и готов к демонстрации и использованию в образовательных целях.
 
